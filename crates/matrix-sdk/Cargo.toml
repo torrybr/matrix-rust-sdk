@@ -16,26 +16,14 @@ features = ["docsrs"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = [
-    "e2e-encryption",
-    "automatic-room-key-forwarding",
-    "sqlite",
-    "native-tls",
-]
-testing = [
-    "matrix-sdk-sqlite?/testing",
-    "matrix-sdk-indexeddb?/testing",
-    "matrix-sdk-base/testing",
-    "wiremock",
-    "matrix-sdk-test",
-    "assert_matches2",
-]
+default = ["e2e-encryption", "automatic-room-key-forwarding", "sqlite", "native-tls"]
+testing = ["matrix-sdk-sqlite?/testing", "matrix-sdk-indexeddb?/testing", "matrix-sdk-base/testing", "wiremock", "matrix-sdk-test", "assert_matches2"]
 
 e2e-encryption = [
     "matrix-sdk-base/e2e-encryption",
     "matrix-sdk-base/message-ids",
-    "matrix-sdk-sqlite?/crypto-store", # activate crypto-store on sqlite if given
-    "matrix-sdk-indexeddb?/e2e-encryption", # activate on indexeddb if given
+    "matrix-sdk-sqlite?/crypto-store",        # activate crypto-store on sqlite if given
+    "matrix-sdk-indexeddb?/e2e-encryption",   # activate on indexeddb if given
 ]
 js = ["matrix-sdk-common/js", "matrix-sdk-base/js"]
 
@@ -44,10 +32,7 @@ bundled-sqlite = ["sqlite", "matrix-sdk-sqlite?/bundled"]
 indexeddb = ["matrix-sdk-indexeddb/state-store"]
 
 qrcode = ["e2e-encryption", "matrix-sdk-base/qrcode"]
-automatic-room-key-forwarding = [
-    "e2e-encryption",
-    "matrix-sdk-base/automatic-room-key-forwarding",
-]
+automatic-room-key-forwarding = ["e2e-encryption", "matrix-sdk-base/automatic-room-key-forwarding"]
 markdown = ["ruma/markdown"]
 native-tls = ["reqwest/native-tls"]
 rustls-tls = ["reqwest/rustls-tls"]
@@ -75,14 +60,7 @@ experimental-sliding-sync = [
 ]
 experimental-widgets = ["dep:language-tags", "dep:uuid"]
 
-docsrs = [
-    "e2e-encryption",
-    "sqlite",
-    "indexeddb",
-    "sso-login",
-    "qrcode",
-    "image-proc",
-]
+docsrs = ["e2e-encryption", "sqlite", "indexeddb", "sso-login", "qrcode", "image-proc"]
 
 [dependencies]
 anyhow = { workspace = true, optional = true }
@@ -117,16 +95,8 @@ matrix-sdk-sqlite = { workspace = true, optional = true }
 matrix-sdk-test = { workspace = true, optional = true }
 mime = "0.3.16"
 mime2ext = "0.1.52"
-rand = { workspace = true, optional = true }
-ruma = { workspace = true, features = [
-    "rand",
-    "unstable-msc2448",
-    "unstable-msc2965",
-    "unstable-msc3930",
-    "unstable-msc3245-v1-compat",
-    "unstable-msc2867",
-    "unstable-msc3489",
-] }
+rand = { workspace = true , optional = true }
+ruma = { workspace = true, features = ["rand", "unstable-msc2448", "unstable-msc2965", "unstable-msc3930", "unstable-msc3245-v1-compat", "unstable-msc2867"] }
 serde = { workspace = true }
 serde_html_form = { workspace = true }
 serde_json = { workspace = true }
