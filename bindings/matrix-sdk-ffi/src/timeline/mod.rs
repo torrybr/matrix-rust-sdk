@@ -26,6 +26,9 @@ use matrix_sdk_ui::timeline::{
     EventItemOrigin, LiveBackPaginationStatus, Profile, TimelineDetails,
 };
 use mime::Mime;
+use ruma::events::beacon::BeaconEventContent;
+use ruma::events::beacon_info::BeaconInfoEventContent;
+use ruma::events::{AnyStateEventContent, StateEventType};
 use ruma::{
     events::{
         location::{AssetType as RumaAssetType, LocationContent, ZoomLevel},
@@ -45,7 +48,7 @@ use ruma::{
         },
         AnyMessageLikeEventContent,
     },
-    EventId, OwnedTransactionId,
+    owned_event_id, server_name, user_id, EventId, OwnedEventId, OwnedTransactionId,
 };
 use tokio::{
     sync::Mutex,
@@ -483,6 +486,35 @@ impl Timeline {
             .edit_poll(poll_data.fallback_text(), poll_data.try_into()?, &edit_item.0)
             .await
             .map_err(|err| anyhow::anyhow!(err))?;
+        Ok(())
+    }
+
+    pub async fn update_user_location(self: Arc<Self>, geo_uri: String) -> Result<(), ClientError> {
+        // This logic is flawed because the beacon might arrive before there is a beacon_info in the hashmap
+        // A temporary solution on the UI is to wait 5 seconds before sending the location beacon
+        let beacon_info_event_id = self.inner.room().get_own_beacon_info();
+
+        let user_id = self.inner.room().own_user_id();
+
+        let evnt =
+            self.inner.room().get_state_event(StateEventType::BeaconInfo, user_id.as_str()).await?;
+
+        let state_event = evnt.unwrap().deserialize();
+
+        let state_event_id = state_event.unwrap().as_sync().unwrap().event_id().to_owned();
+
+        // let state_event = evnt.unwrap().deserialize();
+
+        // let event_id = state_event.unwrap().as_sync().unwrap().event_id().to_owned();
+
+        //Second create a new beacon event with the beacon_info event id as a reference
+        let beacon_event = BeaconEventContent::new(state_event_id, geo_uri.clone(), None);
+        let event_content = AnyMessageLikeEventContent::Beacon(beacon_event.clone());
+
+        RUNTIME.spawn(async move {
+            self.inner.send(event_content).await;
+        });
+
         Ok(())
     }
 

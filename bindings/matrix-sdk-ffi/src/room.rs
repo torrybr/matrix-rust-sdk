@@ -110,6 +110,10 @@ impl Room {
         self.inner.is_space()
     }
 
+    pub fn a_test_ffi_function(&self) -> bool {
+        self.inner.is_space()
+    }
+
     pub fn is_tombstoned(&self) -> bool {
         self.inner.is_tombstoned()
     }
@@ -428,6 +432,20 @@ impl Room {
         Ok(())
     }
 
+    pub fn start_beacon_info(&self, duration_millis: u64) -> Result<(), ClientError> {
+        RUNTIME.block_on(async move {
+            self.inner.start_beacon_info(duration_millis).await?;
+            Ok(())
+        })
+    }
+
+    pub fn stop_beacon_info(&self) -> Result<(), ClientError> {
+        RUNTIME.block_on(async move {
+            self.inner.stop_beacon_info().await;
+            Ok(())
+        })
+    }
+
     /// Upload and set the room's avatar.
     ///
     /// This will upload the data produced by the reader to the homeserver's
@@ -559,6 +577,8 @@ impl Room {
     pub async fn typing_notice(&self, is_typing: bool) -> Result<(), ClientError> {
         Ok(self.inner.typing_notice(is_typing).await?)
     }
+
+    /// ******* End Beacon & Beacon Info Methods *******
 
     pub fn subscribe_to_typing_notifications(
         self: Arc<Self>,

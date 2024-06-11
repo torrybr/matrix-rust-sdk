@@ -472,6 +472,15 @@ impl Room {
         self.inner.read().active_room_call_participants()
     }
 
+    pub fn beacon_info_participants(&self) -> Vec<OwnedUserId> {
+        self.inner.read().beacon_info_participants()
+    }
+
+    pub fn own_beacon_info_event_id(&self) -> OwnedEventId {
+        let own_user_id = self.own_user_id().to_owned();
+        self.inner.read().beacon_info_event_id_by_state_key(own_user_id)
+    }
+
     /// Return the cached display name of the room if it was provided via sync,
     /// or otherwise calculate it, taking into account its name, aliases and
     /// members.
@@ -1278,6 +1287,18 @@ impl RoomInfo {
         v
     }
 
+    /// ***** Beacon & Beacon_Info Methods *****
+    pub fn beacon_info_participants(&self) -> Vec<OwnedUserId> {
+        let owned_ids = self.base_info.beacons.keys().cloned().collect();
+        return owned_ids;
+    }
+
+    /// TODO (tb): Why use OwnedUserId instead of &UserId?
+    pub fn beacon_info_event_id_by_state_key(&self, user_id: OwnedUserId) -> OwnedEventId {
+        // Get the beacon_id of the beacon info event for the state key
+        self.base_info.beacons.get(&user_id).unwrap().clone().event_id().unwrap().to_owned()
+    }
+
     /// Similar to
     /// [`matrix_rtc_memberships`](Self::active_matrix_rtc_memberships) but only
     /// returns Memberships with application "m.call" and scope "m.room".
@@ -1420,6 +1441,7 @@ mod tests {
                 Membership, MembershipInit, OriginalSyncCallMemberEvent,
             },
             room::{
+                beacon_info::{BeaconInfoEventContent, OriginalSyncBeaconInfoEvent},
                 canonical_alias::RoomCanonicalAliasEventContent,
                 member::{
                     MembershipState, RoomMemberEventContent, StrippedRoomMemberEvent,
@@ -2369,5 +2391,44 @@ mod tests {
         // We have no active call anymore after emptying the memberships
         assert_eq!(Vec::<OwnedUserId>::new(), room.active_room_call_participants());
         assert!(!room.has_active_room_call());
+    }
+
+    fn beacon_info_state_event(ev_id: &str, user_id: &UserId, live: bool) -> AnySyncStateEvent {
+        let content = BeaconInfoEventContent::new(None, Default::default(), live);
+
+        AnySyncStateEvent::BeaconInfo(SyncStateEvent::Original(OriginalSyncBeaconInfoEvent {
+            content,
+            event_id: OwnedEventId::from_str(ev_id).unwrap(),
+            sender: user_id.to_owned(),
+            origin_server_ts: timestamp(0),
+            state_key: user_id.to_owned(),
+            unsigned: StateUnsigned::new(),
+        }))
+    }
+
+    fn create_beacon_info_with_member_events_for_user(a: &UserId, b: &UserId, c: &UserId) -> Room {
+        let (_, room) = make_room(RoomState::Joined);
+
+        let a_event = beacon_info_state_event("$1234", a, false);
+
+        // make b 10min old
+        let b_event = beacon_info_state_event("$12345", b, true);
+
+        let c_event = beacon_info_state_event("$123456", c, false);
+
+        // Intentionally use a non time sorted receive order.
+        receive_state_events(&room, vec![&a_event, &b_event, &c_event]);
+
+        room
+    }
+
+    #[test]
+    fn test_beacon_info_participants() {
+        let room = create_beacon_info_with_member_events_for_user(&ALICE, &BOB, &CAROL);
+
+        assert_eq!(
+            vec![ALICE.to_owned(), BOB.to_owned(), CAROL.to_owned()],
+            room.beacon_info_participants()
+        );
     }
 }

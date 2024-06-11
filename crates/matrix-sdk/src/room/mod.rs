@@ -14,16 +14,8 @@ use futures_util::{
     future::{try_join, try_join_all},
     stream::FuturesUnordered,
 };
-use matrix_sdk_base::{
-    deserialized_responses::{
-        RawAnySyncOrStrippedState, RawSyncOrStrippedState, SyncOrStrippedState, TimelineEvent,
-    },
-    instant::Instant,
-    store::StateStoreExt,
-    RoomMemberships, StateChanges,
-};
-use matrix_sdk_common::timeout::timeout;
 use mime::Mime;
+use ruma::events::beacon_info::{BeaconInfoEvent, BeaconInfoEventContent};
 #[cfg(feature = "e2e-encryption")]
 use ruma::events::{
     room::encrypted::OriginalSyncRoomEncryptedEvent, AnySyncMessageLikeEvent, AnySyncTimelineEvent,
@@ -85,11 +77,16 @@ use thiserror::Error;
 use tokio::sync::broadcast;
 use tracing::{debug, info, instrument, warn};
 
-use self::futures::{SendAttachment, SendMessageLikeEvent, SendRawMessageLikeEvent};
-pub use self::{
-    member::{RoomMember, RoomMemberRole},
-    messages::{EventWithContextResponse, Messages, MessagesOptions},
+use matrix_sdk_base::{
+    deserialized_responses::{
+        RawAnySyncOrStrippedState, RawSyncOrStrippedState, SyncOrStrippedState, TimelineEvent,
+    },
+    instant::Instant,
+    store::StateStoreExt,
+    RoomMemberships, StateChanges,
 };
+use matrix_sdk_common::timeout::timeout;
+
 #[cfg(doc)]
 use crate::event_cache::EventCache;
 use crate::{
@@ -105,6 +102,12 @@ use crate::{
     sync::RoomUpdate,
     utils::{IntoRawMessageLikeEventContent, IntoRawStateEventContent},
     BaseRoom, Client, Error, HttpError, HttpResult, Result, RoomState, TransmissionProgress,
+};
+
+use self::futures::{SendAttachment, SendMessageLikeEvent, SendRawMessageLikeEvent};
+pub use self::{
+    member::{RoomMember, RoomMemberRole},
+    messages::{EventWithContextResponse, Messages, MessagesOptions},
 };
 
 pub mod futures;
@@ -334,8 +337,9 @@ impl Room {
         self.client.subscribe_to_room_updates(self.room_id())
     }
 
+    /// ***** End Beacon & Beacon_Info Methods *****
+
     /// Subscribe to typing notifications for this room.
-    ///
     /// The returned receiver will receive a new vector of user IDs for each
     /// sync response that contains 'm.typing' event. The current user ID will
     /// be filtered out.
@@ -1927,6 +1931,32 @@ impl Room {
         self.send_state_event(RoomTopicEventContent::new(topic.into())).await
     }
 
+    /// Start a live location share by sending a beacon_info event
+    pub async fn start_beacon_info(
+        &self,
+        duration_millis: u64,
+    ) -> Result<send_state_event::v3::Response> {
+        self.send_state_event_for_key(
+            self.own_user_id(),
+            BeaconInfoEventContent::new(
+                Option::from("My live location testing".to_string()),
+                Duration::from_millis(duration_millis),
+                true,
+                None,
+            ),
+        )
+        .await
+    }
+
+    /// Get the current beacon_info and set its live key to false.
+    pub async fn stop_beacon_info(&self) {
+        todo!()
+    }
+
+    pub fn get_own_beacon_info(&self) -> OwnedEventId {
+        self.inner.own_beacon_info_event_id()
+    }
+
     /// Sets the new avatar url for this room.
     ///
     /// # Arguments
@@ -2937,22 +2967,24 @@ pub struct TryFromReportedContentScoreError(());
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-    use matrix_sdk_base::SessionMeta;
-    use matrix_sdk_test::{
-        async_test, test_json, JoinedRoomBuilder, StateTestEvent, SyncResponseBuilder,
-    };
     use ruma::{device_id, int, user_id};
     use wiremock::{
         matchers::{header, method, path_regex},
         Mock, MockServer, ResponseTemplate,
     };
 
-    use super::ReportedContentScore;
+    use matrix_sdk_base::SessionMeta;
+    use matrix_sdk_test::{
+        async_test, test_json, JoinedRoomBuilder, StateTestEvent, SyncResponseBuilder,
+    };
+
     use crate::{
         config::RequestConfig,
         matrix_auth::{MatrixSession, MatrixSessionTokens},
         Client,
     };
+
+    use super::ReportedContentScore;
 
     #[cfg(all(feature = "sqlite", feature = "e2e-encryption"))]
     #[async_test]

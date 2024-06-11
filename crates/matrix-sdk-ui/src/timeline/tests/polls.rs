@@ -25,6 +25,8 @@ async fn poll_is_displayed() {
     timeline.send_poll_start(&ALICE, fakes::poll_a()).await;
     let poll_state = timeline.poll_state().await;
 
+    print!("{:#?}", poll_state);
+
     assert_poll_start_eq(&poll_state.start_event_content.poll_start, &fakes::poll_a());
     assert!(poll_state.response_data.is_empty());
 }
@@ -188,10 +190,6 @@ async fn events_received_before_start_are_not_lost() {
 }
 
 impl TestTimeline {
-    async fn event_items(&self) -> Vec<EventTimelineItem> {
-        self.inner.items().await.iter().filter_map(|item| item.as_event().cloned()).collect()
-    }
-
     async fn poll_event(&self) -> EventTimelineItem {
         self.event_items().await[0].clone()
     }

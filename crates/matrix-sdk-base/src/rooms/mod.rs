@@ -15,6 +15,7 @@ pub use normal::{Room, RoomInfo, RoomInfoUpdate, RoomState, RoomStateFilter};
 use ruma::{
     assign,
     events::{
+        beacon_info::BeaconInfoEventContent,
         call::member::CallMemberEventContent,
         macros::EventContent,
         room::{
@@ -78,6 +79,9 @@ impl fmt::Display for DisplayName {
 pub struct BaseRoomInfo {
     /// The avatar URL of this room.
     pub(crate) avatar: Option<MinimalStateEvent<RoomAvatarEventContent>>,
+    /// Active beacon info state in this room.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
+    pub(crate) beacons: BTreeMap<OwnedUserId, MinimalStateEvent<BeaconInfoEventContent>>,
     /// The canonical alias of this room.
     pub(crate) canonical_alias: Option<MinimalStateEvent<RoomCanonicalAliasEventContent>>,
     /// The `m.room.create` event content of this room.
@@ -181,6 +185,10 @@ impl BaseRoomInfo {
             AnySyncStateEvent::RoomPowerLevels(p) => {
                 self.max_power_level = p.power_levels().max().into();
             }
+            // TODO (tb) Do i need a cfg flag? Does the insert business logic go here? for ex. checking if the beacon exists
+            AnySyncStateEvent::BeaconInfo(b) => {
+                self.beacons.insert(b.state_key().clone(), b.into());
+            }
             AnySyncStateEvent::CallMember(m) => {
                 let Some(o_ev) = m.as_original() else {
                     return false;
@@ -257,6 +265,9 @@ impl BaseRoomInfo {
             AnyStrippedStateEvent::CallMember(_) => {
                 // Ignore stripped call state events. Rooms that are not in Joined or Left state
                 // wont have call information.
+                return false;
+            }
+            AnyStrippedStateEvent::BeaconInfo(_) => {
                 return false;
             }
             _ => return false,
@@ -341,6 +352,7 @@ impl Default for BaseRoomInfo {
     fn default() -> Self {
         Self {
             avatar: None,
+            beacons: BTreeMap::new(),
             canonical_alias: None,
             create: None,
             dm_targets: Default::default(),

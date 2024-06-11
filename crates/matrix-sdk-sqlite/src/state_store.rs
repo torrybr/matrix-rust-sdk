@@ -19,6 +19,7 @@ use matrix_sdk_store_encryption::StoreCipher;
 use ruma::{
     canonical_json::{redact, RedactedBecause},
     events::{
+        beacon_info::BeaconInfoEvent,
         presence::PresenceEvent,
         receipt::{Receipt, ReceiptThread, ReceiptType},
         room::{
@@ -1637,6 +1638,15 @@ impl StateStore for SqliteStateStore {
                 Ok(())
             })
             .await
+    }
+
+    async fn start_location_sharing(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        beacon_info: BeaconInfoEvent,
+    ) -> std::result::Result<(), Self::Error> {
+        unimplemented!("(tb): Location sharing is not implemented for the SQLite state store")
     }
 }
 

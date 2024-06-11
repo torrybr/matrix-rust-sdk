@@ -705,10 +705,10 @@ fn process_room_properties(room_data: &v4::SlidingSyncRoom, room_info: &mut Room
 
     if let Some(heroes) = &room_data.heroes {
         // Filter out all the heroes which don't have a user id or name.
-        room_info.update_heroes(
-            heroes.iter().filter_map(|hero| hero.user_id.as_ref()).cloned().collect(),
-            heroes.iter().filter_map(|hero| hero.name.as_ref()).cloned().collect(),
-        );
+        // room_info.update_heroes(
+        //     heroes.iter().filter_map(|hero| hero.user_id.as_ref()).cloned().collect(),
+        //     heroes.iter().filter_map(|hero| hero.name.as_ref()).cloned().collect(),
+        // );
     }
 
     room_info.set_prev_batch(room_data.prev_batch.as_deref());

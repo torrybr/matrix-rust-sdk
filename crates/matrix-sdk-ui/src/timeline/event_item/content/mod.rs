@@ -20,6 +20,7 @@ use matrix_sdk::crypto::types::events::UtdCause;
 use matrix_sdk_base::latest_event::{is_suitable_for_latest_event, PossibleLatestEvent};
 use ruma::{
     events::{
+        beacon_info::BeaconInfoEventContent,
         call::{invite::SyncCallInviteEvent, notify::SyncCallNotifyEvent},
         policy::rule::{
             room::PolicyRuleRoomEventContent, server::PolicyRuleServerEventContent,
@@ -55,6 +56,7 @@ use ruma::{
 };
 use tracing::warn;
 
+use crate::timeline::beacons::BeaconState;
 use crate::timeline::{polls::PollState, TimelineItem};
 
 mod message;
@@ -108,6 +110,9 @@ pub enum TimelineItemContent {
 
     /// An `m.poll.start` event.
     Poll(PollState),
+
+    /// An internal data model for representing beacon_info events and thier associtated last location
+    TestBeaconModel(BeaconState),
 
     /// An `m.call.invite` event
     CallInvite,
@@ -260,6 +265,7 @@ impl TimelineItemContent {
             TimelineItemContent::FailedToParseMessageLike { .. }
             | TimelineItemContent::FailedToParseState { .. } => "an event that couldn't be parsed",
             TimelineItemContent::Poll(_) => "a poll",
+            TimelineItemContent::TestBeaconModel(_) => "a beacon sharing event",
             TimelineItemContent::CallInvite => "a call invite",
             TimelineItemContent::CallNotify => "a call notification",
         }
@@ -334,12 +340,39 @@ impl TimelineItemContent {
         }
     }
 
+    pub(crate) fn beacon_info(
+        user_id: OwnedUserId,
+        full_content: FullStateEventContent<BeaconInfoEventContent>,
+    ) -> Self {
+        match &full_content {
+            FullStateEventContent::Original { content, prev_content } => {
+                // add default to beacon_state as a possibiltly ..Default::default()
+                Self::TestBeaconModel(BeaconState {
+                    beacon_info_event_content: content.clone(),
+                    last_location: None,
+                    end_event_timestamp: None,
+                    user_id,
+                })
+            }
+            FullStateEventContent::Redacted(c) => {
+                // Self::Beacon(BeaconState {
+                //     beacon_info_event_content: c.clone(),
+                //     last_location: None,
+                //     end_event_timestamp: None,
+                // })
+
+                todo!("Handle redacted beacon info")
+            }
+        }
+    }
+
     pub(in crate::timeline) fn redact(&self, room_version: &RoomVersionId) -> Self {
         match self {
             Self::Message(_)
             | Self::RedactedMessage
             | Self::Sticker(_)
             | Self::Poll(_)
+            | Self::TestBeaconModel(_)
             | Self::CallInvite
             | Self::CallNotify
             | Self::UnableToDecrypt(_) => Self::RedactedMessage,
@@ -347,6 +380,10 @@ impl TimelineItemContent {
             Self::ProfileChange(ev) => Self::ProfileChange(ev.redact()),
             Self::OtherState(ev) => Self::OtherState(ev.redact(room_version)),
             Self::FailedToParseMessageLike { .. } | Self::FailedToParseState { .. } => self.clone(),
+            _ => {
+                warn!("Tried to redact an unsupported event type: {:?}", self.debug_string());
+                self.clone()
+            }
         }
     }
 }

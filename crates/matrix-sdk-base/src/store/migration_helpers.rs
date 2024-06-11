@@ -196,6 +196,7 @@ impl BaseRoomInfoV1 {
 
         Box::new(BaseRoomInfo {
             avatar,
+            beacons: Default::default(),
             canonical_alias,
             create,
             dm_targets,

@@ -28,6 +28,7 @@ mod encryption;
 mod error;
 mod event;
 mod helpers;
+mod location;
 mod notification;
 mod notification_settings;
 mod platform;

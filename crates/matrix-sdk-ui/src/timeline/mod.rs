@@ -65,6 +65,7 @@ use self::{
     util::rfind_event_item,
 };
 
+mod beacons;
 mod builder;
 mod day_dividers;
 mod error;

@@ -30,6 +30,7 @@ use ruma::{
 use tracing::{debug, error, instrument, trace, warn};
 
 use super::{HandleManyEventsResult, ReactionState, TimelineInnerSettings};
+use crate::timeline::beacons::BeaconPendingEvents;
 use crate::{
     events::SyncTimelineEventWithoutContent,
     timeline::{
@@ -707,6 +708,10 @@ pub(in crate::timeline) struct TimelineInnerMetadata {
     /// timeline.
     internal_id_prefix: Option<String>,
 
+    // TODO (tb): add beacon_pending_events here? Edge case for beacon comes in before beacon_info
+    // Ask sdk team why this was created in the first place
+    pub beacon_pending_events: BeaconPendingEvents,
+
     pub reactions: Reactions,
     pub poll_pending_events: PollPendingEvents,
     pub fully_read_event: Option<OwnedEventId>,
@@ -751,6 +756,7 @@ impl TimelineInnerMetadata {
             read_receipts: Default::default(),
             reaction_state: Default::default(),
             in_flight_reaction: Default::default(),
+            beacon_pending_events: Default::default(),
             room_version,
             unable_to_decrypt_hook,
             internal_id_prefix,

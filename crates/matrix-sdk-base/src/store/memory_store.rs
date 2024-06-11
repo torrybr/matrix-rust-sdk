@@ -21,6 +21,8 @@ use std::{
 use async_trait::async_trait;
 use growable_bloom_filter::GrowableBloom;
 use matrix_sdk_common::{instant::Instant, ring_buffer::RingBuffer};
+// use matrix_sdk_test::SyncResponseFile::Default;
+use ruma::events::beacon_info::BeaconInfoEvent;
 use ruma::{
     canonical_json::{redact, RedactedBecause},
     events::{
@@ -84,6 +86,8 @@ pub struct MemoryStore {
     >,
     media: StdRwLock<RingBuffer<(OwnedMxcUri, String /* unique key */, Vec<u8>)>>,
     custom: StdRwLock<HashMap<Vec<u8>, Vec<u8>>>,
+    // TODO (tb): Verify this is the correct way to store the beacons. Not sure I need this?
+    beacons: StdRwLock<HashMap<OwnedRoomId, BeaconInfoEvent>>,
 }
 
 // SAFETY: `new_unchecked` is safe because 20 is not zero.
@@ -111,6 +115,7 @@ impl Default for MemoryStore {
             room_event_receipts: Default::default(),
             media: StdRwLock::new(RingBuffer::new(NUMBER_OF_MEDIAS)),
             custom: Default::default(),
+            beacons: Default::default(),
         }
     }
 }
@@ -495,6 +500,16 @@ impl StateStore for MemoryStore {
 
         debug!("Saved changes in {:?}", now.elapsed());
 
+        Ok(())
+    }
+
+    async fn start_location_sharing(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        beacon_info: BeaconInfoEvent,
+    ) -> std::result::Result<(), Self::Error> {
+        // todo!("(tb): Implement this method");
         Ok(())
     }
 

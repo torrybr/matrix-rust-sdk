@@ -23,7 +23,7 @@ use ruma::events::{
 use tracing::warn;
 
 use super::ProfileDetails;
-use crate::ruma::{ImageInfo, MessageType, PollKind};
+use crate::ruma::{ImageInfo, LocationContent, MessageType, PollKind};
 
 #[derive(Clone, uniffi::Object)]
 pub struct TimelineItemContent(pub(crate) matrix_sdk_ui::timeline::TimelineItemContent);
@@ -42,6 +42,36 @@ impl TimelineItemContent {
                     body: content.body.clone(),
                     info: (&content.info).into(),
                     source: Arc::new(MediaSource::from(content.source.clone())),
+                }
+            }
+
+            Content::TestBeaconModel(beacon_state) => {
+                let Some(location) = beacon_state.last_location() else {
+                    warn!("Beacon state not available yet");
+                    return TimelineItemContentKind::FailedToParseMessageLike {
+                        event_type: "org.matrix.msc3672.beacon".to_string(),
+                        error: "Could not find beacon last location content".to_string(),
+                    };
+                };
+
+                let body = match location.description {
+                    Some(description) => description,
+                    None => "Location".to_string(),
+                };
+
+                let location = LocationContent {
+                    body: body,
+                    geo_uri: location.uri,
+                    description: None,
+                    zoom_level: None,
+                    asset: None,
+                };
+
+                TimelineItemContentKind::TestBeaconModel {
+                    location,
+                    timeout: 0,
+                    ts: 0,
+                    user_id: String::from(beacon_state.user_id()),
                 }
             }
             Content::Poll(poll_state) => TimelineItemContentKind::from(poll_state.results()),
@@ -125,6 +155,13 @@ pub enum TimelineItemContentKind {
         votes: HashMap<String, Vec<String>>,
         end_time: Option<u64>,
         has_been_edited: bool,
+    },
+    // TODO (tb): create data structure of vec location content for global map tracking.
+    TestBeaconModel {
+        location: LocationContent,
+        timeout: u64,
+        ts: u64,
+        user_id: String,
     },
     CallInvite,
     CallNotify,

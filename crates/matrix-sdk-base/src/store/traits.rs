@@ -23,6 +23,7 @@ use as_variant::as_variant;
 use async_trait::async_trait;
 use growable_bloom_filter::GrowableBloom;
 use matrix_sdk_common::AsyncTraitDeps;
+use ruma::events::beacon_info::BeaconInfoEvent;
 use ruma::{
     events::{
         presence::PresenceEvent,
@@ -85,6 +86,14 @@ pub trait StateStore: AsyncTraitDeps {
 
     /// Save the set of state changes in the store.
     async fn save_changes(&self, changes: &StateChanges) -> Result<(), Self::Error>;
+
+    //TODO (tb): implement start beacon function?
+    async fn start_location_sharing(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        beacon_info: BeaconInfoEvent,
+    ) -> Result<(), Self::Error>;
 
     /// Get the stored presence event for the given user.
     ///
@@ -427,6 +436,15 @@ impl<T: StateStore> StateStore for EraseStateStoreError<T> {
 
     async fn save_changes(&self, changes: &StateChanges) -> Result<(), Self::Error> {
         self.0.save_changes(changes).await.map_err(Into::into)
+    }
+
+    async fn start_location_sharing(
+        &self,
+        room_id: &RoomId,
+        user_id: &UserId,
+        beacon_info: BeaconInfoEvent,
+    ) -> Result<(), Self::Error> {
+        unimplemented!("(tb): implement start beacon function, placeholder for compile")
     }
 
     async fn get_presence_event(

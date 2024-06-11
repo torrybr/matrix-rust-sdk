@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use as_variant::as_variant;
 use eyeball_im::{ObservableVectorTransaction, ObservableVectorTransactionEntry};
+use futures_util::stream::Any;
 use indexmap::{map::Entry, IndexMap};
 use matrix_sdk::{
     crypto::types::events::UtdCause, deserialized_responses::EncryptionInfo,
@@ -23,6 +24,8 @@ use matrix_sdk::{
 };
 use ruma::{
     events::{
+        beacon::BeaconEventContent,
+        beacon_info::BeaconInfoEventContent,
         poll::{
             unstable_end::UnstablePollEndEventContent,
             unstable_response::UnstablePollResponseEventContent,
@@ -62,6 +65,7 @@ use super::{
     EventTimelineItem, InReplyToDetails, Message, OtherState, ReactionGroup, ReactionSenderData,
     Sticker, TimelineDetails, TimelineItem, TimelineItemContent,
 };
+use crate::timeline::beacons::BeaconState;
 use crate::{events::SyncTimelineEventWithoutContent, DEFAULT_SANITIZER_MODE};
 
 /// When adding an event, useful information related to the source of the event.
@@ -132,6 +136,13 @@ pub(super) enum TimelineEventKind {
         sender: OwnedUserId,
     },
 
+    /// A timeline event for a beacon info update.
+    BeaconInfo {
+        user_id: OwnedUserId,
+        content: FullStateEventContent<BeaconInfoEventContent>,
+        sender: OwnedUserId,
+    },
+
     /// A state update that's not a [`Self::RoomMember`] event.
     OtherState { state_key: String, content: AnyOtherFullStateEventContent },
 
@@ -175,6 +186,21 @@ impl TimelineEventKind {
                         sender: ev.sender,
                     },
                     SyncStateEvent::Redacted(ev) => Self::RoomMember {
+                        user_id: ev.state_key,
+                        content: FullStateEventContent::Redacted(ev.content),
+                        sender: ev.sender,
+                    },
+                },
+                AnySyncStateEvent::BeaconInfo(ev) => match ev {
+                    SyncStateEvent::Original(ev) => Self::BeaconInfo {
+                        user_id: ev.state_key,
+                        content: FullStateEventContent::Original {
+                            content: ev.content,
+                            prev_content: ev.unsigned.prev_content,
+                        },
+                        sender: ev.sender,
+                    },
+                    SyncStateEvent::Redacted(ev) => Self::BeaconInfo {
                         user_id: ev.state_key,
                         content: FullStateEventContent::Redacted(ev.content),
                         sender: ev.sender,
@@ -376,6 +402,9 @@ impl<'a, 'o> TimelineEventHandler<'a, 'o> {
                         self.add_item(TimelineItemContent::Sticker(Sticker { content }));
                     }
                 }
+                AnyMessageLikeEventContent::Beacon(c) => {
+                    self.handle_beacon(c);
+                }
                 AnyMessageLikeEventContent::UnstablePollStart(
                     UnstablePollStartEventContent::Replacement(c),
                 ) => self.handle_poll_start_edit(c.relates_to),
@@ -420,6 +449,12 @@ impl<'a, 'o> TimelineEventHandler<'a, 'o> {
             TimelineEventKind::RoomMember { user_id, content, sender } => {
                 if should_add {
                     self.add_item(TimelineItemContent::room_member(user_id, content, sender));
+                }
+            }
+
+            TimelineEventKind::BeaconInfo { user_id, content, sender } => {
+                if should_add {
+                    self.add_item(TimelineItemContent::beacon_info(user_id, content));
                 }
             }
 
@@ -646,11 +681,42 @@ impl<'a, 'o> TimelineEventHandler<'a, 'o> {
         }
     }
 
+    // fn handle_beacon_info(
+    //     &mut self,
+    //     full_content: FullStateEventContent<BeaconInfoEventContent>,
+    //     user_id: OwnedUserId,
+    //     should_add: bool,
+    // ) {
+    //     let beacon_state = BeaconState::new(, user_id);
+    //     self.add(should_add, TimelineItemContent::TestBeaconModel(beacon_state));
+    // }
+
+    fn handle_beacon(&mut self, c: BeaconEventContent) {
+        trace!("Trying to find event id {:?}", &c.relates_to.event_id);
+        let found = self.update_timeline_item(&c.relates_to.event_id, |this, event_item| {
+            trace!(
+                "Found event with id. {:?}. Updating beacon in beacon_state",
+                &c.relates_to.event_id
+            );
+            let beacon_state =
+                as_variant!(event_item.content(), TimelineItemContent::TestBeaconModel)?;
+            Some(event_item.with_content(
+                TimelineItemContent::TestBeaconModel(beacon_state.update_beacon(&c)),
+                None,
+            ))
+        });
+
+        if !found {
+            // TODO (tb): Should we do something here?
+            info!("Beacon info event not found");
+        }
+    }
+
     fn handle_poll_start(&mut self, c: NewUnstablePollStartEventContent, should_add: bool) {
         let mut poll_state = PollState::new(c);
         if let Flow::Remote { event_id, .. } = self.ctx.flow.clone() {
             // Applying the cache to remote events only because local echoes
-            // don't have an event ID that could be referenced by responses yet.
+            // don't have an event ID that could be referenced by respons s yet.
             self.meta.poll_pending_events.apply(&event_id, &mut poll_state);
         }
 
