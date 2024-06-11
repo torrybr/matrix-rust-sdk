@@ -1,15 +1,18 @@
-use crate::timeline::beacons::BeaconState;
-use crate::timeline::tests::beacon::fakes::create_beacon_info;
-use crate::timeline::tests::TestTimeline;
-use crate::timeline::{EventTimelineItem, TimelineItemContent};
 use matrix_sdk_test::{async_test, ALICE, BOB};
-use ruma::events::room::beacon_info::BeaconInfoEventContent;
-use ruma::{server_name, EventId, OwnedEventId, UserId};
+use ruma::{
+    events::{
+        beacon::BeaconEventContent, beacon_info::BeaconInfoEventContent, location::LocationContent,
+        AnyMessageLikeEventContent,
+    },
+    server_name, EventId, OwnedEventId, UserId,
+};
 
-use ruma::events::beacon::BeaconEventContent;
+use crate::timeline::{
+    beacons::BeaconState,
+    tests::{beacon::fakes::create_beacon_info, TestTimeline},
+    EventTimelineItem, TimelineItemContent,
+};
 
-use ruma::events::location::LocationContent;
-use ruma::events::AnyMessageLikeEventContent;
 #[async_test]
 async fn beacon_info_is_correctly_processed_in_timeline() {
     let timeline = TestTimeline::new();
@@ -200,7 +203,7 @@ impl TestTimeline {
     async fn send_beacon(&self, user: &UserId, event_id: &EventId, geo_uri: String) {
         let owner = OwnedEventId::from(event_id);
 
-        let beacon = BeaconEventContent::new(owner.clone(), geo_uri);
+        let beacon = BeaconEventContent::new(owner.clone(), geo_uri, None);
 
         let event_content = AnyMessageLikeEventContent::Beacon(beacon.clone());
 
@@ -225,7 +228,7 @@ impl EventTimelineItem {
 }
 
 mod fakes {
-    use ruma::events::room::beacon_info::BeaconInfoEventContent;
+    use ruma::events::beacon_info::BeaconInfoEventContent;
     use std::time::Duration;
 
     pub fn create_beacon_info(desc: &str, duration: u64) -> BeaconInfoEventContent {
