@@ -26,11 +26,10 @@ use matrix_sdk_ui::timeline::{
     EventItemOrigin, LiveBackPaginationStatus, Profile, TimelineDetails,
 };
 use mime::Mime;
-use ruma::events::beacon::BeaconEventContent;
-use ruma::events::beacon_info::BeaconInfoEventContent;
-use ruma::events::{AnyStateEventContent, StateEventType};
 use ruma::{
     events::{
+        beacon::BeaconEventContent,
+        beacon_info::BeaconInfoEventContent
         location::{AssetType as RumaAssetType, LocationContent, ZoomLevel},
         poll::{
             unstable_end::UnstablePollEndEventContent,
@@ -46,7 +45,8 @@ use ruma::{
             ForwardThread, LocationMessageEventContent, MessageType,
             RoomMessageEventContentWithoutRelation,
         },
-        AnyMessageLikeEventContent,
+        AnyMessageLikeEventContent, AnyStateEventContent, StateEventType
+        
     },
     owned_event_id, server_name, user_id, EventId, OwnedEventId, OwnedTransactionId,
 };

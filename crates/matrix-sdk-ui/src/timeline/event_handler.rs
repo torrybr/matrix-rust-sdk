@@ -716,7 +716,7 @@ impl<'a, 'o> TimelineEventHandler<'a, 'o> {
         let mut poll_state = PollState::new(c);
         if let Flow::Remote { event_id, .. } = self.ctx.flow.clone() {
             // Applying the cache to remote events only because local echoes
-            // don't have an event ID that could be referenced by respons s yet.
+            // don't have an event ID that could be referenced by responses yet.
             self.meta.poll_pending_events.apply(&event_id, &mut poll_state);
         }
 
