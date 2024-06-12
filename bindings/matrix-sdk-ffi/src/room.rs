@@ -110,10 +110,6 @@ impl Room {
         self.inner.is_space()
     }
 
-    pub fn a_test_ffi_function(&self) -> bool {
-        self.inner.is_space()
-    }
-
     pub fn is_tombstoned(&self) -> bool {
         self.inner.is_tombstoned()
     }
@@ -577,8 +573,6 @@ impl Room {
     pub async fn typing_notice(&self, is_typing: bool) -> Result<(), ClientError> {
         Ok(self.inner.typing_notice(is_typing).await?)
     }
-
-    /// ******* End Beacon & Beacon Info Methods *******
 
     pub fn subscribe_to_typing_notifications(
         self: Arc<Self>,
