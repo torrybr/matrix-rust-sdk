@@ -760,7 +760,6 @@ impl App {
                         | TimelineItemContent::CallNotify => {
                             continue;
                         }
-                        _ => {}
                     }
                 }
 
