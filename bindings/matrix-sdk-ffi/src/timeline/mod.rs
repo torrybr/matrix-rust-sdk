@@ -14,6 +14,18 @@
 
 use std::{collections::HashMap, fmt::Write as _, fs, sync::Arc};
 
+use self::content::{Reaction, ReactionSenderData, TimelineItemContent};
+use crate::{
+    client::ProgressWatcher,
+    error::{ClientError, RoomError},
+    helpers::unwrap_or_clone_arc,
+    ruma::{
+        AssetType, AudioInfo, FileInfo, FormattedBody, ImageInfo, PollKind, ThumbnailInfo,
+        VideoInfo,
+    },
+    task_handle::TaskHandle,
+    RUNTIME,
+};
 use anyhow::{Context, Result};
 use as_variant::as_variant;
 use eyeball_im::VectorDiff;
@@ -22,12 +34,15 @@ use matrix_sdk::attachment::{
     AttachmentConfig, AttachmentInfo, BaseAudioInfo, BaseFileInfo, BaseImageInfo,
     BaseThumbnailInfo, BaseVideoInfo, Thumbnail,
 };
+use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk_ui::timeline::{
     EventItemOrigin, LiveBackPaginationStatus, Profile, TimelineDetails,
 };
 use mime::Mime;
 use ruma::{
     events::{
+        beacon::BeaconEventContent,
+        beacon_info::BeaconInfoEventContent,
         location::{AssetType as RumaAssetType, LocationContent, ZoomLevel},
         poll::{
             unstable_end::UnstablePollEndEventContent,
@@ -43,7 +58,7 @@ use ruma::{
             ForwardThread, LocationMessageEventContent, MessageType,
             RoomMessageEventContentWithoutRelation,
         },
-        AnyMessageLikeEventContent,
+        AnyMessageLikeEventContent, SyncStateEvent,
     },
     EventId,
 };
@@ -53,19 +68,6 @@ use tokio::{
 };
 use tracing::{error, info, warn};
 use uuid::Uuid;
-
-use self::content::{Reaction, ReactionSenderData, TimelineItemContent};
-use crate::{
-    client::ProgressWatcher,
-    error::{ClientError, RoomError},
-    helpers::unwrap_or_clone_arc,
-    ruma::{
-        AssetType, AudioInfo, FileInfo, FormattedBody, ImageInfo, PollKind, ThumbnailInfo,
-        VideoInfo,
-    },
-    task_handle::TaskHandle,
-    RUNTIME,
-};
 
 mod content;
 
@@ -469,6 +471,49 @@ impl Timeline {
             .edit_poll(poll_data.fallback_text(), poll_data.try_into()?, &edit_item.0)
             .await
             .map_err(|err| anyhow::anyhow!(err))?;
+        Ok(())
+    }
+
+    /// Sends a user's location as a beacon based on their last beacon_info event.
+    ///
+    /// Retrieves the last beacon_info from the room state and sends a beacon with the geo_uri.
+    /// Since only one active beacon_info per user per room is allowed, we can grab the currently live
+    /// beacon_info event from the room state.
+    ///
+    /// TODO: Does the logic belong in self.inner.room() or here?
+    pub async fn send_user_location_beacon(
+        self: Arc<Self>,
+        geo_uri: String,
+    ) -> Result<(), ClientError> {
+        let Some(raw_event) = self
+            .inner
+            .room()
+            .get_state_event_static_for_key::<BeaconInfoEventContent, _>(
+                self.inner.room().own_user_id(),
+            )
+            .await?
+        else {
+            todo!("How to handle case of missing beacon event for state key?")
+        };
+
+        match raw_event.deserialize() {
+            Ok(SyncOrStrippedState::Sync(SyncStateEvent::Original(beacon_info))) => {
+                if beacon_info.content.is_live() {
+                    let beacon_event =
+                        BeaconEventContent::new(beacon_info.event_id, geo_uri.clone(), None);
+                    let message_content = AnyMessageLikeEventContent::Beacon(beacon_event.clone());
+
+                    RUNTIME.spawn(async move {
+                        self.inner.send(message_content).await;
+                    });
+                }
+            }
+            Ok(SyncOrStrippedState::Sync(SyncStateEvent::Redacted(_))) => {}
+            Ok(SyncOrStrippedState::Stripped(_)) => {}
+            Err(e) => {
+                info!(room_id = ?self.inner.room().room_id(), "Could not deserialize m.beacon_info: {e}");
+            }
+        }
         Ok(())
     }
 

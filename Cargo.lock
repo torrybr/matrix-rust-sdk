@@ -3188,6 +3188,7 @@ dependencies = [
  "indexmap 2.2.6",
  "js_int",
  "language-tags",
+ "log",
  "mas-oidc-client",
  "matrix-sdk-base",
  "matrix-sdk-common",
@@ -3472,7 +3473,7 @@ dependencies = [
  "byteorder",
  "image",
  "qrcode 0.14.0",
- "ruma-common",
+ "ruma-common 0.13.0 (git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66)",
  "thiserror",
  "vodozemac",
 ]
@@ -5001,13 +5002,13 @@ dependencies = [
 [[package]]
 name = "ruma"
 version = "0.10.1"
-source = "git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66#75e8829bec0b7bc5332860e1fb2df658d5c71d66"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
 dependencies = [
  "assign",
  "js_int",
  "js_option",
  "ruma-client-api",
- "ruma-common",
+ "ruma-common 0.13.0 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "ruma-events",
  "ruma-federation-api",
  "ruma-html",
@@ -5018,7 +5019,7 @@ dependencies = [
 [[package]]
 name = "ruma-client-api"
 version = "0.18.0"
-source = "git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66#75e8829bec0b7bc5332860e1fb2df658d5c71d66"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
 dependencies = [
  "as_variant",
  "assign",
@@ -5028,7 +5029,7 @@ dependencies = [
  "js_int",
  "js_option",
  "maplit",
- "ruma-common",
+ "ruma-common 0.13.0 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "ruma-events",
  "serde",
  "serde_html_form",
@@ -5047,6 +5048,32 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "form_urlencoded",
+ "indexmap 2.2.6",
+ "js_int",
+ "percent-encoding",
+ "regex",
+ "ruma-identifiers-validation 0.9.5 (git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66)",
+ "ruma-macros 0.13.0 (git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66)",
+ "serde",
+ "serde_html_form",
+ "serde_json",
+ "thiserror",
+ "time",
+ "tracing",
+ "url",
+ "web-time",
+ "wildmatch",
+]
+
+[[package]]
+name = "ruma-common"
+version = "0.13.0"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
+dependencies = [
+ "as_variant",
+ "base64 0.22.1",
+ "bytes",
+ "form_urlencoded",
  "getrandom",
  "http 1.1.0",
  "indexmap 2.2.6",
@@ -5056,8 +5083,8 @@ dependencies = [
  "percent-encoding",
  "rand",
  "regex",
- "ruma-identifiers-validation",
- "ruma-macros",
+ "ruma-identifiers-validation 0.9.5 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
+ "ruma-macros 0.13.0 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "serde",
  "serde_html_form",
  "serde_json",
@@ -5073,7 +5100,7 @@ dependencies = [
 [[package]]
 name = "ruma-events"
 version = "0.28.1"
-source = "git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66#75e8829bec0b7bc5332860e1fb2df658d5c71d66"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
 dependencies = [
  "as_variant",
  "indexmap 2.2.6",
@@ -5082,10 +5109,10 @@ dependencies = [
  "percent-encoding",
  "pulldown-cmark",
  "regex",
- "ruma-common",
+ "ruma-common 0.13.0 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "ruma-html",
- "ruma-identifiers-validation",
- "ruma-macros",
+ "ruma-identifiers-validation 0.9.5 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
+ "ruma-macros 0.13.0 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "serde",
  "serde_json",
  "thiserror",
@@ -5097,10 +5124,10 @@ dependencies = [
 [[package]]
 name = "ruma-federation-api"
 version = "0.9.0"
-source = "git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66#75e8829bec0b7bc5332860e1fb2df658d5c71d66"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
 dependencies = [
  "js_int",
- "ruma-common",
+ "ruma-common 0.13.0 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "ruma-events",
  "serde",
  "serde_json",
@@ -5109,7 +5136,7 @@ dependencies = [
 [[package]]
 name = "ruma-html"
 version = "0.2.0"
-source = "git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66#75e8829bec0b7bc5332860e1fb2df658d5c71d66"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
 dependencies = [
  "as_variant",
  "html5ever",
@@ -5128,6 +5155,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruma-identifiers-validation"
+version = "0.9.5"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
+dependencies = [
+ "js_int",
+ "thiserror",
+]
+
+[[package]]
 name = "ruma-macros"
 version = "0.13.0"
 source = "git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66#75e8829bec0b7bc5332860e1fb2df658d5c71d66"
@@ -5136,7 +5172,22 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "ruma-identifiers-validation",
+ "ruma-identifiers-validation 0.9.5 (git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66)",
+ "serde",
+ "syn 2.0.63",
+ "toml 0.8.12",
+]
+
+[[package]]
+name = "ruma-macros"
+version = "0.13.0"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
+dependencies = [
+ "once_cell",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "ruma-identifiers-validation 0.9.5 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "serde",
  "syn 2.0.63",
  "toml 0.8.12",
@@ -5145,10 +5196,10 @@ dependencies = [
 [[package]]
 name = "ruma-push-gateway-api"
 version = "0.9.0"
-source = "git+https://github.com/ruma/ruma?rev=75e8829bec0b7bc5332860e1fb2df658d5c71d66#75e8829bec0b7bc5332860e1fb2df658d5c71d66"
+source = "git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8#f60c79727a826b0df2056d0d4ea36945991febe8"
 dependencies = [
  "js_int",
- "ruma-common",
+ "ruma-common 0.13.0 (git+https://github.com/ruma/ruma?rev=f60c79727a826b0df2056d0d4ea36945991febe8)",
  "ruma-events",
  "serde",
  "serde_json",

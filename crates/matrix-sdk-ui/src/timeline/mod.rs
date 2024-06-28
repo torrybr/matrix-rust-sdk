@@ -18,6 +18,7 @@
 
 use std::{path::PathBuf, pin::Pin, sync::Arc, task::Poll};
 
+use crate::timeline::traits::RoomDataProvider;
 use eyeball_im::VectorDiff;
 use futures_core::Stream;
 use imbl::Vector;
@@ -60,6 +61,7 @@ use tracing::{debug, error, instrument, trace, warn};
 
 use self::{event_handler::TimelineEventKind, futures::SendAttachment};
 
+mod beacons;
 mod builder;
 mod day_dividers;
 mod error;
@@ -574,6 +576,9 @@ impl Timeline {
         let item = self.inner.prepare_retry(txn_id).await.ok_or(Error::RetryEventNotInTimeline)?;
 
         let content = match item {
+            TimelineItemContent::BeaconInfoState(_) => {
+                error_return!("Retrying state events/beacon info events is not supported");
+            }
             TimelineItemContent::Message(msg) => {
                 AnyMessageLikeEventContent::RoomMessage(msg.into())
             }

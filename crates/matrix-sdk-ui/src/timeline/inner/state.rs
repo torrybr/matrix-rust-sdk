@@ -30,6 +30,7 @@ use ruma::{
 use tracing::{debug, error, instrument, trace, warn};
 
 use super::{HandleManyEventsResult, ReactionState, TimelineInnerSettings};
+use crate::timeline::beacons::BeaconPendingEvents;
 use crate::{
     events::SyncTimelineEventWithoutContent,
     timeline::{
@@ -710,6 +711,8 @@ pub(in crate::timeline) struct TimelineInnerMetadata {
     pub poll_pending_events: PollPendingEvents,
     pub fully_read_event: Option<OwnedEventId>,
 
+    pub beacon_pending_events: BeaconPendingEvents,
+
     /// Whether we have a fully read-marker item in the timeline, that's up to
     /// date with the room's read marker.
     ///
@@ -739,6 +742,7 @@ impl TimelineInnerMetadata {
         unable_to_decrypt_hook: Option<Arc<UtdHookManager>>,
     ) -> Self {
         Self {
+            beacon_pending_events: Default::default(),
             all_events: Default::default(),
             next_internal_id: Default::default(),
             reactions: Default::default(),
