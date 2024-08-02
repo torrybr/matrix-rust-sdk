@@ -58,7 +58,9 @@ use super::{
     traits::RoomDataProvider,
     EventTimelineItem, Profile, TimelineFocus, TimelineInner, TimelineItem,
 };
-use crate::unable_to_decrypt_hook::UtdHookManager;
+use crate::{
+    timeline::pinned_events_loader::PinnedEventsRoom, unable_to_decrypt_hook::UtdHookManager,
+};
 
 mod basic;
 mod echo;
@@ -71,6 +73,7 @@ mod polls;
 mod reactions;
 mod read_receipts;
 mod redaction;
+mod shields;
 mod virt;
 
 struct TestTimeline {
@@ -90,6 +93,7 @@ impl TestTimeline {
                 TimelineFocus::Live,
                 Some(prefix),
                 None,
+                false,
             ),
             event_builder: EventBuilder::new(),
         }
@@ -97,7 +101,7 @@ impl TestTimeline {
 
     fn with_room_data_provider(room_data_provider: TestRoomDataProvider) -> Self {
         Self {
-            inner: TimelineInner::new(room_data_provider, TimelineFocus::Live, None, None),
+            inner: TimelineInner::new(room_data_provider, TimelineFocus::Live, None, None, false),
             event_builder: EventBuilder::new(),
         }
     }
@@ -109,6 +113,20 @@ impl TestTimeline {
                 TimelineFocus::Live,
                 None,
                 Some(hook),
+                true,
+            ),
+            event_builder: EventBuilder::new(),
+        }
+    }
+
+    fn with_is_room_encrypted(encrypted: bool) -> Self {
+        Self {
+            inner: TimelineInner::new(
+                TestRoomDataProvider::default(),
+                TimelineFocus::Live,
+                None,
+                None,
+                encrypted,
             ),
             event_builder: EventBuilder::new(),
         }
@@ -296,6 +314,22 @@ impl PaginableRoom for TestRoomDataProvider {
     }
 
     async fn messages(&self, _opts: MessagesOptions) -> Result<Messages, PaginatorError> {
+        unimplemented!();
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+impl PinnedEventsRoom for TestRoomDataProvider {
+    async fn event(&self, _event_id: &EventId) -> Result<SyncTimelineEvent, PaginatorError> {
+        unimplemented!();
+    }
+
+    fn pinned_event_ids(&self) -> Vec<OwnedEventId> {
+        unimplemented!();
+    }
+
+    fn is_pinned_event(&self, _event_id: &EventId) -> bool {
         unimplemented!();
     }
 }

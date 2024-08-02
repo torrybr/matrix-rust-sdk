@@ -16,12 +16,12 @@ use ruma::UserId;
 use tracing::error;
 use vodozemac::Curve25519PublicKey;
 
-use super::{InboundGroupSession, SenderData, SenderDataRetryDetails};
+use super::{InboundGroupSession, SenderData};
 use crate::{
-    error::{OlmResult, SessionCreationError},
+    error::MismatchedIdentityKeysError,
     store::Store,
     types::{events::olm_v1::DecryptedRoomKeyEvent, DeviceKeys},
-    CryptoStoreError, Device, DeviceData, OlmError,
+    CryptoStoreError, Device, DeviceData, MegolmError, OlmError, SignatureError,
 };
 
 /// Temporary struct that is used to look up [`SenderData`] based on the
@@ -139,7 +139,7 @@ impl<'a> SenderDataFinder<'a> {
         sender_curve_key: Curve25519PublicKey,
         room_key_event: &'a DecryptedRoomKeyEvent,
         session: &'a InboundGroupSession,
-    ) -> OlmResult<SenderData> {
+    ) -> Result<SenderData, SessionDeviceKeysCheckError> {
         let finder = Self { store, session };
         finder.have_event(sender_curve_key, room_key_event).await
     }
@@ -149,9 +149,21 @@ impl<'a> SenderDataFinder<'a> {
         store: &'a Store,
         device_keys: DeviceKeys,
         session: &'a InboundGroupSession,
-    ) -> OlmResult<SenderData> {
+    ) -> Result<SenderData, SessionDeviceKeysCheckError> {
         let finder = Self { store, session };
         finder.have_device_keys(&device_keys).await
+    }
+
+    /// Find the device using the curve key provided, and decide whether we
+    /// trust the sender.
+    pub(crate) async fn find_using_curve_key(
+        store: &'a Store,
+        sender_curve_key: Curve25519PublicKey,
+        sender_user_id: &'a UserId,
+        session: &'a InboundGroupSession,
+    ) -> Result<SenderData, SessionDeviceCheckError> {
+        let finder = Self { store, session };
+        finder.search_for_device(sender_curve_key, sender_user_id).await
     }
 
     /// Step A (start - we have a to-device message containing a room key)
@@ -159,7 +171,7 @@ impl<'a> SenderDataFinder<'a> {
         &self,
         sender_curve_key: Curve25519PublicKey,
         room_key_event: &'a DecryptedRoomKeyEvent,
-    ) -> OlmResult<SenderData> {
+    ) -> Result<SenderData, SessionDeviceKeysCheckError> {
         // Does the to-device message contain the device_keys property from MSC4147?
         if let Some(sender_device_keys) = &room_key_event.device_keys {
             // Yes: use the device keys to continue
@@ -175,21 +187,20 @@ impl<'a> SenderDataFinder<'a> {
         &self,
         sender_curve_key: Curve25519PublicKey,
         sender_user_id: &UserId,
-    ) -> Result<SenderData, CryptoStoreError> {
+    ) -> Result<SenderData, SessionDeviceCheckError> {
         // Does the locally-cached (in the store) devices list contain a device with the
         // curve key of the sender of the to-device message?
         if let Some(sender_device) =
             self.store.get_device_from_curve_key(sender_user_id, sender_curve_key).await?
         {
             // Yes: use the device to continue
-            Ok(self.have_device(sender_device))
+            self.have_device(sender_device)
         } else {
             // Step C (we don't know the sending device)
             //
             // We have no device data for this session so we can't continue in the "fast
             // lane" (blocking sync).
             let sender_data = SenderData::UnknownDevice {
-                retry_details: SenderDataRetryDetails::retry_soon(),
                 // This is not a legacy session since we did attempt to look
                 // up its sender data at the time of reception.
                 // legacy_session: false,
@@ -202,42 +213,34 @@ impl<'a> SenderDataFinder<'a> {
         }
     }
 
-    async fn have_device_keys(&self, sender_device_keys: &DeviceKeys) -> OlmResult<SenderData> {
+    async fn have_device_keys(
+        &self,
+        sender_device_keys: &DeviceKeys,
+    ) -> Result<SenderData, SessionDeviceKeysCheckError> {
         // Validate the signature of the DeviceKeys supplied.
-        match DeviceData::try_from(sender_device_keys) {
-            Ok(sender_device_data) => {
-                let sender_device = self.store.wrap_device_data(sender_device_data).await?;
-                Ok(self.have_device(sender_device))
-            }
-            Err(e) => {
-                // The device keys supplied did not validate.
-                Err(OlmError::SessionCreation(SessionCreationError::InvalidDeviceKeys(e)))
-            }
-        }
+        let sender_device_data = DeviceData::try_from(sender_device_keys)?;
+        let sender_device = self.store.wrap_device_data(sender_device_data).await?;
+        Ok(self.have_device(sender_device)?)
     }
 
     /// Step D (we have a device)
     ///
     /// Returns Err if the device does not own the session.
-    fn have_device(&self, sender_device: Device) -> SenderData {
+    fn have_device(&self, sender_device: Device) -> Result<SenderData, SessionDeviceCheckError> {
         // Is the session owned by the device?
-        // Note: the only error case from is_owner_of_session would be
-        // MegolmError::MismatchedIdentityKeys, so we can treat this the same as
-        // Ok(false).
-        let device_is_owner = sender_device.is_owner_of_session(self.session).unwrap_or(false);
+        let device_is_owner = sender_device.is_owner_of_session(self.session)?;
 
         // Is the device cross-signed?
         // Does the cross-signing key match that used to sign the device?
         // And is the signature in the device valid?
         let cross_signed = sender_device.is_cross_signed_by_owner();
 
-        match (device_is_owner, cross_signed) {
+        Ok(match (device_is_owner, cross_signed) {
             (true, true) => self.device_is_cross_signed_by_sender(sender_device),
             (true, false) => {
                 // F (we have device keys, but they are not signed by the sender)
                 SenderData::DeviceInfo {
                     device_keys: sender_device.as_device_keys().clone(),
-                    retry_details: SenderDataRetryDetails::retry_soon(),
                     legacy_session: true, // TODO: change to false when we have all the retry code
                 }
             }
@@ -245,12 +248,11 @@ impl<'a> SenderDataFinder<'a> {
                 // Step E (the device does not own the session)
                 // Give up: something is wrong with the session.
                 SenderData::UnknownDevice {
-                    retry_details: SenderDataRetryDetails::retry_soon(),
                     legacy_session: true, // TODO: change to false when all SenderData work is done
                     owner_check_failed: true,
                 }
             }
-        }
+        })
     }
 
     /// Step G (device is cross-signed by the sender)
@@ -277,9 +279,92 @@ impl<'a> SenderDataFinder<'a> {
 
             SenderData::DeviceInfo {
                 device_keys: sender_device.as_device_keys().clone(),
-                retry_details: SenderDataRetryDetails::retry_soon(),
                 legacy_session: true, // TODO: change to false when retries etc. are done
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SessionDeviceCheckError {
+    CryptoStoreError(CryptoStoreError),
+    MismatchedIdentityKeys(MismatchedIdentityKeysError),
+}
+
+impl From<CryptoStoreError> for SessionDeviceCheckError {
+    fn from(e: CryptoStoreError) -> Self {
+        Self::CryptoStoreError(e)
+    }
+}
+
+impl From<MismatchedIdentityKeysError> for SessionDeviceCheckError {
+    fn from(e: MismatchedIdentityKeysError) -> Self {
+        Self::MismatchedIdentityKeys(e)
+    }
+}
+
+impl From<SessionDeviceCheckError> for OlmError {
+    fn from(e: SessionDeviceCheckError) -> Self {
+        match e {
+            SessionDeviceCheckError::CryptoStoreError(e) => e.into(),
+            SessionDeviceCheckError::MismatchedIdentityKeys(e) => {
+                OlmError::SessionCreation(e.into())
+            }
+        }
+    }
+}
+
+impl From<SessionDeviceCheckError> for MegolmError {
+    fn from(e: SessionDeviceCheckError) -> Self {
+        match e {
+            SessionDeviceCheckError::CryptoStoreError(e) => e.into(),
+            SessionDeviceCheckError::MismatchedIdentityKeys(e) => e.into(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SessionDeviceKeysCheckError {
+    CryptoStoreError(CryptoStoreError),
+    MismatchedIdentityKeys(MismatchedIdentityKeysError),
+    SignatureError(SignatureError),
+}
+
+impl From<CryptoStoreError> for SessionDeviceKeysCheckError {
+    fn from(e: CryptoStoreError) -> Self {
+        Self::CryptoStoreError(e)
+    }
+}
+
+impl From<MismatchedIdentityKeysError> for SessionDeviceKeysCheckError {
+    fn from(e: MismatchedIdentityKeysError) -> Self {
+        Self::MismatchedIdentityKeys(e)
+    }
+}
+
+impl From<SignatureError> for SessionDeviceKeysCheckError {
+    fn from(e: SignatureError) -> Self {
+        Self::SignatureError(e)
+    }
+}
+
+impl From<SessionDeviceCheckError> for SessionDeviceKeysCheckError {
+    fn from(e: SessionDeviceCheckError) -> Self {
+        match e {
+            SessionDeviceCheckError::CryptoStoreError(e) => Self::CryptoStoreError(e),
+            SessionDeviceCheckError::MismatchedIdentityKeys(e) => Self::MismatchedIdentityKeys(e),
+        }
+    }
+}
+
+impl From<SessionDeviceKeysCheckError> for OlmError {
+    fn from(e: SessionDeviceKeysCheckError) -> Self {
+        match e {
+            SessionDeviceKeysCheckError::CryptoStoreError(e) => e.into(),
+            SessionDeviceKeysCheckError::MismatchedIdentityKeys(e) => {
+                OlmError::SessionCreation(e.into())
+            }
+            SessionDeviceKeysCheckError::SignatureError(e) => OlmError::SessionCreation(e.into()),
         }
     }
 }
@@ -296,7 +381,11 @@ mod tests {
 
     use super::SenderDataFinder;
     use crate::{
-        olm::{InboundGroupSession, PrivateCrossSigningIdentity, SenderData},
+        error::MismatchedIdentityKeysError,
+        olm::{
+            group_sessions::sender_data_finder::SessionDeviceKeysCheckError, InboundGroupSession,
+            PrivateCrossSigningIdentity, SenderData,
+        },
         store::{Changes, CryptoStoreWrapper, MemoryStore, Store},
         types::{
             events::{
@@ -329,11 +418,7 @@ mod tests {
             .unwrap();
 
         // Then we get back no useful information at all
-        assert_let!(
-            SenderData::UnknownDevice { retry_details, legacy_session, owner_check_failed } =
-                sender_data
-        );
-        assert_eq!(retry_details.retry_count, 0);
+        assert_let!(SenderData::UnknownDevice { legacy_session, owner_check_failed } = sender_data);
 
         // TODO: This should not be marked as a legacy session, but for now it is
         // because we haven't finished implementing the whole sender_data and
@@ -357,11 +442,8 @@ mod tests {
             .unwrap();
 
         // Then we get back the device keys that were in the event
-        assert_let!(
-            SenderData::DeviceInfo { device_keys, retry_details, legacy_session } = sender_data
-        );
+        assert_let!(SenderData::DeviceInfo { device_keys, legacy_session } = sender_data);
         assert_eq!(&device_keys, setup.sender_device.as_device_keys());
-        assert_eq!(retry_details.retry_count, 0);
 
         // TODO: This should not be marked as a legacy session, but for now it is
         // because we haven't finished implementing the whole sender_data and
@@ -384,11 +466,8 @@ mod tests {
             .unwrap();
 
         // Then we get back the device keys that were in the store
-        assert_let!(
-            SenderData::DeviceInfo { device_keys, retry_details, legacy_session } = sender_data
-        );
+        assert_let!(SenderData::DeviceInfo { device_keys, legacy_session } = sender_data);
         assert_eq!(&device_keys, setup.sender_device.as_device_keys());
-        assert_eq!(retry_details.retry_count, 0);
 
         // TODO: This should not be marked as a legacy session, but for now it is
         // because we haven't finished implementing the whole sender_data and
@@ -411,11 +490,8 @@ mod tests {
 
         // Then we store the device info even though it is useless, in case we want to
         // check it matches up later.
-        assert_let!(
-            SenderData::DeviceInfo { device_keys, retry_details, legacy_session } = sender_data
-        );
+        assert_let!(SenderData::DeviceInfo { device_keys, legacy_session } = sender_data);
         assert_eq!(&device_keys, setup.sender_device.as_device_keys());
-        assert_eq!(retry_details.retry_count, 0);
 
         // TODO: This should not be marked as a legacy session, but for now it is
         // because we haven't finished implementing the whole sender_data and
@@ -542,7 +618,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn test_does_not_add_sender_data_for_a_session_not_owned_by_the_device() {
+    async fn test_if_session_signing_does_not_match_device_return_an_error() {
         // Given everything is the same as the above test
         // except the session is not owned by the device
         let setup = TestSetup::new(
@@ -556,17 +632,53 @@ mod tests {
         let finder = SenderDataFinder::new(&setup.store, &setup.session);
 
         // When we try to find sender data
+        assert_let!(
+            Err(e) =
+                finder.have_event(setup.sender_device_curve_key(), &setup.room_key_event).await
+        );
+
+        assert_let!(SessionDeviceKeysCheckError::MismatchedIdentityKeys(e) = e);
+
+        let key_ed25519 =
+            Box::new(setup.session.signing_keys().iter().next().unwrap().1.ed25519().unwrap());
+        let key_curve25519 = Box::new(setup.session.sender_key());
+
+        let device_ed25519 = setup.sender_device.ed25519_key().map(Box::new);
+        let device_curve25519 = Some(Box::new(setup.sender_device_curve_key()));
+
+        assert_eq!(
+            e,
+            MismatchedIdentityKeysError {
+                key_ed25519,
+                device_ed25519,
+                key_curve25519,
+                device_curve25519
+            }
+        );
+    }
+
+    #[async_test]
+    async fn test_does_not_add_sender_data_for_a_device_missing_keys() {
+        // Given everything is the same as the successful test
+        // except the device does not own the session because
+        // it is imported.
+        let setup = TestSetup::new(
+            TestOptions::new()
+                .store_contains_sender_identity()
+                .session_is_imported()
+                .event_contains_device_keys(),
+        )
+        .await;
+        let finder = SenderDataFinder::new(&setup.store, &setup.session);
+
+        // When we try to find sender data
         let sender_data = finder
             .have_event(setup.sender_device_curve_key(), &setup.room_key_event)
             .await
             .unwrap();
 
         // Then we fail to find useful sender data
-        assert_let!(
-            SenderData::UnknownDevice { retry_details, legacy_session, owner_check_failed } =
-                sender_data
-        );
-        assert_eq!(retry_details.retry_count, 0);
+        assert_let!(SenderData::UnknownDevice { legacy_session, owner_check_failed } = sender_data);
 
         // TODO: This should not be marked as a legacy session, but for now it is
         // because we haven't finished implementing the whole sender_data and
@@ -674,6 +786,7 @@ mod tests {
         sender_is_ourself: bool,
         sender_is_verified: bool,
         session_signing_key_differs_from_device: bool,
+        session_is_imported: bool,
     }
 
     impl TestOptions {
@@ -686,6 +799,7 @@ mod tests {
                 sender_is_ourself: false,
                 sender_is_verified: false,
                 session_signing_key_differs_from_device: false,
+                session_is_imported: false,
             }
         }
 
@@ -721,6 +835,11 @@ mod tests {
 
         fn session_signing_key_differs_from_device(mut self) -> Self {
             self.session_signing_key_differs_from_device = true;
+            self
+        }
+
+        fn session_is_imported(mut self) -> Self {
+            self.session_is_imported = true;
             self
         }
     }
@@ -767,7 +886,7 @@ mod tests {
                 sender_device.inner.ed25519_key().unwrap()
             };
 
-            let session = InboundGroupSession::new(
+            let mut session = InboundGroupSession::new(
                 sender_device.inner.curve25519_key().unwrap(),
                 signing_key,
                 room_id,
@@ -777,6 +896,9 @@ mod tests {
                 None,
             )
             .unwrap();
+            if options.session_is_imported {
+                session.mark_as_imported();
+            }
 
             Self { sender, sender_device, store, room_key_event, session }
         }
