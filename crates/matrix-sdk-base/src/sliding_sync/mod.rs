@@ -2269,19 +2269,6 @@ mod tests {
         let event_user_id = beacon_info_events[0].0.clone();
 
         assert_eq!(event_user_id, user_a_id);
-        //
-        // // Pinned event ids are now empty
-        // let mut room_response = http::response::Room::new();
-        // room_response.required_state.push(make_state_event(
-        //     user_a_id,
-        //     "",
-        //     RoomPinnedEventsEventContent::new(Vec::new()),
-        //     None,
-        // ));
-        // let response = response_with_room(room_id, room_response);
-        // client.process_sliding_sync(&response, &(), true).await.expect("Failed to process sync");
-        // let pinned_event_ids = room.pinned_event_ids();
-        // assert!(pinned_event_ids.is_empty());
     }
 
     async fn choose_event_to_cache(events: &[SyncTimelineEvent]) -> Option<SyncTimelineEvent> {

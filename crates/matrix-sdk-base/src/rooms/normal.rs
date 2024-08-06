@@ -57,10 +57,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tracing::{debug, field::debug, info, instrument, warn};
 
-use super::{
-    members::MemberRoomInfo, BaseRoomInfo, DisplayName, RoomCreateWithCreatorEventContent,
-    RoomMember, RoomNotableTags,
-};
+use super::{members::MemberRoomInfo, BaseRoomInfo, DisplayName, RoomCreateWithCreatorEventContent, RoomMember, RoomNotableTags, LiveLocationShare};
 #[cfg(feature = "experimental-sliding-sync")]
 use crate::latest_event::LatestEvent;
 use crate::{
@@ -1420,21 +1417,12 @@ impl RoomInfo {
     }
 
     /// Return a list of all the live location shares in this room.
-    fn live_location_shares(&self) -> Vec<(OwnedUserId, BeaconInfoEventContent)> {
+    fn live_location_shares(&self) -> Vec<(OwnedUserId, LiveLocationShare)> {
         self.base_info.beacons.iter().filter_map(|(user_id, ev)| {
             ev.as_original().map(|ev| {
                 (user_id.clone(), ev.content.clone())
             })
         }).collect()
-    }
-
-    /// Get a list of all the valid (non-expired) live location shares and the
-    /// associated UserId's in this room.
-    fn active_live_location_shares(&self) -> Vec<(OwnedUserId, BeaconInfoEventContent)> {
-        self.live_location_shares()
-            .into_iter()
-            .filter(|(_user_id, beacon)| beacon.is_live())
-            .collect()
     }
 
     /// Get a list of all the valid (non expired) matrixRTC memberships and

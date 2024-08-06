@@ -42,6 +42,7 @@ use ruma::{
     room::RoomType,
     EventId, OwnedUserId, RoomVersionId,
 };
+use ruma::events::beacon::BeaconEventContent;
 use serde::{Deserialize, Serialize};
 
 use crate::MinimalStateEvent;
@@ -85,7 +86,7 @@ pub struct BaseRoomInfo {
     pub(crate) avatar: Option<MinimalStateEvent<RoomAvatarEventContent>>,
     /// All shared live location beacons of this room.
     #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
-    pub(crate) beacons: BTreeMap<OwnedUserId, MinimalStateEvent<BeaconInfoEventContent>>,
+    pub(crate) beacons: BTreeMap<OwnedUserId, LiveLocationShare>,
     /// The canonical alias of this room.
     pub(crate) canonical_alias: Option<MinimalStateEvent<RoomCanonicalAliasEventContent>>,
     /// The `m.room.create` event content of this room.
@@ -149,7 +150,9 @@ impl BaseRoomInfo {
     pub fn handle_state_event(&mut self, ev: &AnySyncStateEvent) -> bool {
         match ev {
             AnySyncStateEvent::BeaconInfo(b) => {
-                self.beacons.insert(b.state_key().clone(), b.into());
+                self.beacons.insert(b.state_key().clone(), {
+                    LiveLocationShare { beacon_info: b.into(), last_location: None }
+                });
             }
             // No redacted branch - enabling encryption cannot be undone.
             AnySyncStateEvent::RoomEncryption(SyncStateEvent::Original(encryption)) => {
@@ -371,6 +374,12 @@ impl Default for BaseRoomInfo {
             pinned_events: None,
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LiveLocationShare {
+    pub beacon_info: MinimalStateEvent<BeaconInfoEventContent>,
+    pub last_location: Option(BeaconEventContent),
 }
 
 /// The content of an `m.room.create` event, with a required `creator` field.
