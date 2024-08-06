@@ -1977,7 +1977,7 @@ impl Room {
     /// This method checks the `RoomPowerLevels` events instead of loading the
     /// member list and looking for the member.
     pub async fn get_suggested_user_role(&self, user_id: &UserId) -> Result<RoomMemberRole> {
-        let power_level = self.get_user_power_level(user_id).await?;
+        let power_level = self.xget_user_power_level(user_id).await?;
         Ok(RoomMemberRole::suggested_role_for_power_level(power_level))
     }
 
@@ -2352,6 +2352,14 @@ impl Room {
     /// The call may fail if there is an error in getting the power levels.
     pub async fn can_user_trigger_room_notification(&self, user_id: &UserId) -> Result<bool> {
         Ok(self.room_power_levels().await?.user_can_trigger_room_notification(user_id))
+    }
+
+    /// Return true if the user with the given user_id is able to start/stop a
+    /// live location share in the room.
+    ///
+    /// The call may fail if there is an error in getting the power levels.
+    pub async fn can_user_share_live_location(&self, user_id: &UserId) -> Result<bool> {
+        Ok(self.room_power_levels().await?.user_can_send_state(user_id, StateEventType::BeaconInfo))
     }
 
     /// Get a list of servers that should know this room.
