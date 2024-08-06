@@ -845,7 +845,7 @@ mod tests {
         collections::{BTreeMap, HashSet},
         sync::{Arc, RwLock as SyncRwLock},
     };
-
+    use std::time::Duration;
     use assert_matches::assert_matches;
     use matrix_sdk_common::{deserialized_responses::SyncTimelineEvent, ring_buffer::RingBuffer};
     use matrix_sdk_test::async_test;
@@ -869,6 +869,7 @@ mod tests {
         serde::Raw,
         uint, user_id, JsOption, MxcUri, OwnedRoomId, OwnedUserId, RoomAliasId, RoomId, UserId,
     };
+    use ruma::events::beacon_info::BeaconInfoEventContent;
     use serde_json::json;
 
     use super::{cache_latest_events, http};
@@ -2224,6 +2225,63 @@ mod tests {
         client.process_sliding_sync(&response, &(), true).await.expect("Failed to process sync");
         let pinned_event_ids = room.pinned_event_ids();
         assert!(pinned_event_ids.is_empty());
+    }
+
+    #[async_test]
+    async fn test_live_location_share_is_updated_on_sync() {
+        let user_a_id = user_id!("@a:e.uk");
+        let client = logged_in_base_client(Some(user_a_id)).await;
+        let room_id = room_id!("!r:e.uk");
+
+        // Create room
+        let mut room_response = http::response::Room::new();
+        set_room_joined(&mut room_response, user_a_id);
+        let response = response_with_room(room_id, room_response);
+        client.process_sliding_sync(&response, &(), true).await.expect("Failed to process sync");
+
+        // The newly created room has no live location shares
+        let room = client.get_room(room_id).unwrap();
+        let beacon_info_events = room.live_location_shares();
+        assert!(beacon_info_events.is_empty());
+
+        let beacon_info_event = BeaconInfoEventContent::new(
+            None,
+            Duration::from_millis(3000),
+            true,
+            None,
+        );
+
+        // Start a live location share
+        let mut room_response = http::response::Room::new();
+        room_response.required_state.push(make_state_event(
+            user_a_id,
+            "@a:e.uk",
+            beacon_info_event,
+            None,
+        ));
+        let response = response_with_room(room_id, room_response);
+        client.process_sliding_sync(&response, &(), true).await.expect("Failed to process sync");
+
+        let beacon_info_events = room.live_location_shares();
+        assert_eq!(beacon_info_events.len(), 1);
+
+        let event = beacon_info_events[0].1.clone();
+        let event_user_id = beacon_info_events[0].0.clone();
+
+        assert_eq!(event_user_id, user_a_id);
+        //
+        // // Pinned event ids are now empty
+        // let mut room_response = http::response::Room::new();
+        // room_response.required_state.push(make_state_event(
+        //     user_a_id,
+        //     "",
+        //     RoomPinnedEventsEventContent::new(Vec::new()),
+        //     None,
+        // ));
+        // let response = response_with_room(room_id, room_response);
+        // client.process_sliding_sync(&response, &(), true).await.expect("Failed to process sync");
+        // let pinned_event_ids = room.pinned_event_ids();
+        // assert!(pinned_event_ids.is_empty());
     }
 
     async fn choose_event_to_cache(events: &[SyncTimelineEvent]) -> Option<SyncTimelineEvent> {

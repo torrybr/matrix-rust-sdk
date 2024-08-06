@@ -1914,6 +1914,8 @@ impl Room {
         fut.await
     }
 
+    /// TODO (tb) interesting to see if we can resue this for saving updates to beacons map
+
     /// Update the power levels of a select set of users of this room.
     ///
     /// Issue a `power_levels` state event request to the server, changing the

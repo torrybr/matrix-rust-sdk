@@ -52,6 +52,7 @@ use ruma::{
     EventId, MxcUri, OwnedEventId, OwnedMxcUri, OwnedRoomAliasId, OwnedRoomId, OwnedUserId,
     RoomAliasId, RoomId, RoomVersionId, UserId,
 };
+use ruma::events::beacon_info::BeaconInfoEventContent;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tracing::{debug, field::debug, info, instrument, warn};
@@ -961,6 +962,10 @@ impl Room {
     pub fn pinned_event_ids(&self) -> Vec<OwnedEventId> {
         self.inner.read().pinned_event_ids()
     }
+
+    pub fn live_location_shares(&self) -> Vec<(OwnedUserId, BeaconInfoEventContent)> {
+        self.inner.read().live_location_shares()
+    }
 }
 
 /// The underlying pure data structure for joined and left rooms.
@@ -1412,6 +1417,24 @@ impl RoomInfo {
     /// Returns the topic for this room, if set.
     pub fn topic(&self) -> Option<&str> {
         Some(&self.base_info.topic.as_ref()?.as_original()?.content.topic)
+    }
+
+    /// Return a list of all the live location shares in this room.
+    fn live_location_shares(&self) -> Vec<(OwnedUserId, BeaconInfoEventContent)> {
+        self.base_info.beacons.iter().filter_map(|(user_id, ev)| {
+            ev.as_original().map(|ev| {
+                (user_id.clone(), ev.content.clone())
+            })
+        }).collect()
+    }
+
+    /// Get a list of all the valid (non-expired) live location shares and the
+    /// associated UserId's in this room.
+    fn active_live_location_shares(&self) -> Vec<(OwnedUserId, BeaconInfoEventContent)> {
+        self.live_location_shares()
+            .into_iter()
+            .filter(|(_user_id, beacon)| beacon.is_live())
+            .collect()
     }
 
     /// Get a list of all the valid (non expired) matrixRTC memberships and

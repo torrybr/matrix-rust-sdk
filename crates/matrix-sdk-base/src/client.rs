@@ -416,6 +416,11 @@ impl BaseClient {
                                 }
                                 _ => (),
                             },
+                            AnySyncMessageLikeEvent::Beacon(
+                                SyncMessageLikeEvent::Original(beacon_event),
+                            ) => {
+                                println!("Beacon event timeline hander: {:?}", beacon_event);
+                            }
                             _ if e.event_type().to_string().starts_with("m.key.verification") => {
                                 Box::pin(self.handle_verification_event(e, room.room_id())).await?;
                             }
