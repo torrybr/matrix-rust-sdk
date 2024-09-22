@@ -76,7 +76,7 @@ async fn test_send_location_beacon() {
         }),
         None,
     )
-    .await;
+        .await;
 
     mock_encryption_state(&server, false).await;
 
@@ -146,7 +146,7 @@ async fn test_send_location_beacon_with_expired_live_share() {
         }),
         None,
     )
-    .await;
+        .await;
 
     let sync_settings = SyncSettings::new().timeout(Duration::from_millis(3000));
 
@@ -208,7 +208,7 @@ async fn test_most_recent_event_in_stream() {
         }),
         None,
     )
-    .await;
+        .await;
     let sync_settings = SyncSettings::new().timeout(Duration::from_millis(3000));
     let _response = client.sync_once(sync_settings.clone()).await.unwrap();
     server.reset().await;
@@ -317,7 +317,7 @@ async fn test_observe_single_live_location_share() {
         }),
         None,
     )
-    .await;
+        .await;
 
     let sync_settings = SyncSettings::new().timeout(Duration::from_millis(3000));
     let _response = client.sync_once(sync_settings.clone()).await.unwrap();
@@ -354,7 +354,7 @@ async fn test_observe_single_live_location_share() {
             .build_json_sync_response(),
         None,
     )
-    .await;
+        .await;
 
     let _response = client.sync_once(sync_settings.clone()).await.unwrap();
     server.reset().await;

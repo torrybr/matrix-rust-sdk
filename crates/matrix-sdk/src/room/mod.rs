@@ -75,7 +75,7 @@ use ruma::{
     },
     assign,
     events::{
-        beacon::BeaconEventContent,
+        beacon::{BeaconEventContent, OriginalSyncBeaconEvent},
         beacon_info::BeaconInfoEventContent,
         call::notify::{ApplicationType, CallNotifyEventContent, NotifyType},
         direct::DirectEventContent,
@@ -110,12 +110,13 @@ use ruma::{
     push::{Action, PushConditionRoomCtx},
     serde::Raw,
     time::Instant,
-    EventId, Int, MatrixToUri, MatrixUri, MxcUri, OwnedEventId, OwnedRoomId, OwnedServerName,
-    OwnedTransactionId, OwnedUserId, RoomId, TransactionId, UInt, UserId,
+    EventId, Int, MatrixToUri, MatrixUri, MilliSecondsSinceUnixEpoch, MxcUri, OwnedEventId,
+    OwnedRoomId, OwnedServerName, OwnedTransactionId, OwnedUserId, RoomId, TransactionId, UInt,
+    UserId,
 };
 use serde::de::DeserializeOwned;
 use thiserror::Error;
-use tokio::sync::broadcast;
+use tokio::{sync::broadcast, task::JoinHandle};
 use tracing::{debug, info, instrument, warn};
 
 use self::futures::{SendAttachment, SendMessageLikeEvent, SendRawMessageLikeEvent};
