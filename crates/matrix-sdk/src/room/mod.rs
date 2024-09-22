@@ -70,7 +70,7 @@ use ruma::{
     },
     assign,
     events::{
-        beacon::BeaconEventContent,
+        beacon::{BeaconEventContent, OriginalSyncBeaconEvent},
         beacon_info::BeaconInfoEventContent,
         call::notify::{ApplicationType, CallNotifyEventContent, NotifyType},
         direct::DirectEventContent,
@@ -105,8 +105,9 @@ use ruma::{
     push::{Action, PushConditionRoomCtx},
     serde::Raw,
     time::Instant,
-    EventId, Int, MatrixToUri, MatrixUri, MxcUri, OwnedEventId, OwnedRoomId, OwnedServerName,
-    OwnedTransactionId, OwnedUserId, RoomId, TransactionId, UInt, UserId,
+    EventId, Int, MatrixToUri, MatrixUri, MilliSecondsSinceUnixEpoch, MxcUri, OwnedEventId,
+    OwnedRoomId, OwnedServerName, OwnedTransactionId, OwnedUserId, RoomId, TransactionId, UInt,
+    UserId,
 };
 #[cfg(feature = "e2e-encryption")]
 use ruma::{
@@ -118,7 +119,7 @@ use ruma::{
 };
 use serde::de::DeserializeOwned;
 use thiserror::Error;
-use tokio::sync::broadcast;
+use tokio::{sync::broadcast, task::JoinHandle};
 use tracing::{debug, info, instrument, warn};
 
 use self::futures::{SendAttachment, SendMessageLikeEvent, SendRawMessageLikeEvent};
@@ -3013,7 +3014,7 @@ impl Room {
         Ok(())
     }
 
-    /// Get the beacon information event in the room for the current user.
+    /// Get the beacon information event in the room for the `user_id`.
     ///
     /// # Errors
     ///
@@ -3021,9 +3022,10 @@ impl Room {
     /// not be deserialized.
     async fn get_user_beacon_info(
         &self,
+        user_id: &UserId,
     ) -> Result<OriginalSyncStateEvent<BeaconInfoEventContent>, BeaconError> {
         let raw_event = self
-            .get_state_event_static_for_key::<BeaconInfoEventContent, _>(self.own_user_id())
+            .get_state_event_static_for_key::<BeaconInfoEventContent, _>(user_id)
             .await?
             .ok_or(BeaconError::NotFound)?;
 
@@ -3076,7 +3078,7 @@ impl Room {
     ) -> Result<send_state_event::v3::Response, BeaconError> {
         self.ensure_room_joined()?;
 
-        let mut beacon_info_event = self.get_user_beacon_info().await?;
+        let mut beacon_info_event = self.get_user_beacon_info(self.own_user_id()).await?;
         beacon_info_event.content.stop();
         Ok(self.send_state_event_for_key(self.own_user_id(), beacon_info_event.content).await?)
     }
@@ -3098,7 +3100,7 @@ impl Room {
     ) -> Result<send_message_event::v3::Response, BeaconError> {
         self.ensure_room_joined()?;
 
-        let beacon_info_event = self.get_user_beacon_info().await?;
+        let beacon_info_event = self.get_user_beacon_info(self.own_user_id()).await?;
 
         if beacon_info_event.content.is_live() {
             let content = BeaconEventContent::new(beacon_info_event.event_id, geo_uri, None);
@@ -3188,6 +3190,40 @@ impl Room {
                 _ => Err(http_error.into()),
             },
         }
+    }
+
+    /// Subscribe to live location sharing events for this room.
+    ///
+    /// The returned receiver will receive a new event for each sync response
+    /// that contains a 'm.beacon' event.
+    pub async fn subscribe_to_live_location_shares(
+        &self,
+    ) -> (JoinHandle<()>, broadcast::Receiver<LiveLocationShare>) {
+        let (sender, receiver) = broadcast::channel(16);
+
+        let client = self.client.clone();
+        let room_id = self.room_id().to_owned();
+
+        let handle: JoinHandle<()> = tokio::spawn(async move {
+            let beacon_event_handler_handle = client.add_room_event_handler(&room_id, {
+                move |event: OriginalSyncBeaconEvent| async move {
+                    let live_location_share = LiveLocationShare {
+                        user_id: event.sender,
+                        last_location: LastLocation {
+                            location: event.content.location,
+                            ts: event.content.ts,
+                        },
+                    };
+
+                    // Send the live location update to all subscribers.
+                    let _ = sender.send(live_location_share);
+                }
+            });
+
+            let _ = beacon_event_handler_handle;
+        });
+
+        (handle, receiver)
     }
 }
 
