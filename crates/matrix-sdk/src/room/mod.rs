@@ -46,7 +46,9 @@ use matrix_sdk_base::{
     ComposerDraft, RoomInfoNotableUpdateReasons, RoomMemberships, StateChanges, StateStoreDataKey,
     StateStoreDataValue,
 };
-use matrix_sdk_common::{deserialized_responses::SyncTimelineEvent, timeout::timeout};
+use matrix_sdk_common::{
+    deserialized_responses::SyncTimelineEvent, executor::spawn, timeout::timeout,
+};
 use mime::Mime;
 #[cfg(feature = "e2e-encryption")]
 use ruma::events::{
