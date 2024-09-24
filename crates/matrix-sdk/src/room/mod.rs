@@ -47,7 +47,9 @@ use matrix_sdk_base::{
     StateStoreDataValue,
 };
 use matrix_sdk_common::{
-    deserialized_responses::SyncTimelineEvent, executor::spawn, timeout::timeout,
+    deserialized_responses::SyncTimelineEvent,
+    executor::{spawn, JoinHandle},
+    timeout::timeout,
 };
 use mime::Mime;
 use ruma::{
@@ -121,7 +123,7 @@ use ruma::{
 };
 use serde::de::DeserializeOwned;
 use thiserror::Error;
-use tokio::{sync::broadcast, task::JoinHandle};
+use tokio::sync::broadcast;
 use tracing::{debug, info, instrument, warn};
 
 use self::futures::{SendAttachment, SendMessageLikeEvent, SendRawMessageLikeEvent};
