@@ -6,7 +6,7 @@ use matrix_sdk_test::{
     async_test, mocks::mock_encryption_state, sync_timeline_event, test_json, JoinedRoomBuilder,
     SyncResponseBuilder, DEFAULT_TEST_ROOM_ID,
 };
-use ruma::{event_id, time::SystemTime, MilliSecondsSinceUnixEpoch};
+use ruma::{event_id, events::location::AssetType, time::SystemTime, MilliSecondsSinceUnixEpoch};
 use serde_json::json;
 use wiremock::{
     matchers::{body_partial_json, header, method, path_regex},
@@ -164,10 +164,13 @@ async fn test_subscribe_to_live_location_shares() {
 
     let mut sync_builder = SyncResponseBuilder::new();
 
-    // Get the current timestamp for the `beacon_info` event.
-    let current_timestamp =
-        SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_millis()
-            as u64;
+    let current_time = MilliSecondsSinceUnixEpoch::now();
+    let millis_time = current_time
+        .to_system_time()
+        .unwrap()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis() as u64;
 
     mock_sync(
         &server,
@@ -182,12 +185,12 @@ async fn test_subscribe_to_live_location_shares() {
                                     "content": {
                                         "description": "Live Share",
                                         "live": true,
-                                        "org.matrix.msc3488.ts": current_timestamp,
-                                        "timeout": 600_000,
+                                        "org.matrix.msc3488.ts": millis_time,
+                                        "timeout": 3000,
                                         "org.matrix.msc3488.asset": { "type": "m.self" }
                                     },
                                     "event_id": "$15139375514XsgmR:localhost",
-                                    "origin_server_ts": 1_636_829_458,
+                                    "origin_server_ts": millis_time,
                                     "sender": "@example:localhost",
                                     "state_key": "@example:localhost",
                                     "type": "org.matrix.msc3672.beacon_info",
@@ -253,6 +256,13 @@ async fn test_subscribe_to_live_location_shares() {
         live_location_share.last_location.ts,
         MilliSecondsSinceUnixEpoch(uint!(1_636_829_458))
     );
+
+    assert!(live_location_share.beacon_info.live);
+    assert!(live_location_share.beacon_info.is_live());
+    assert_eq!(live_location_share.beacon_info.description, Some("Live Share".to_owned()));
+    assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
+    assert_eq!(live_location_share.beacon_info.ts, current_time);
+    assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
 
     task_handle.await.unwrap();
 }
