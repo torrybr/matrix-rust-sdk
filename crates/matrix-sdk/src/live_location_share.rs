@@ -14,7 +14,10 @@
 
 //! Types for live location sharing.
 
-use ruma::{events::location::LocationContent, MilliSecondsSinceUnixEpoch, OwnedUserId};
+use ruma::{
+    events::{beacon_info::BeaconInfoEventContent, location::LocationContent},
+    MilliSecondsSinceUnixEpoch, OwnedUserId,
+};
 
 /// Details of the last known location beacon.
 #[derive(Clone, Debug)]
@@ -30,8 +33,8 @@ pub struct LastLocation {
 pub struct LiveLocationShare {
     /// The user's last known location.
     pub last_location: LastLocation,
-    // /// Information about the associated beacon event (currently commented out).
-    // pub beacon_info: BeaconInfoEventContent,
+    /// Information about the associated beacon event.
+    pub beacon_info: BeaconInfoEventContent,
     /// The user ID of the person sharing their live location.
     pub user_id: OwnedUserId,
 }

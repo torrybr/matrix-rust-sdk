@@ -136,7 +136,7 @@ use crate::{
     error::{BeaconError, WrongRoomState},
     event_cache::{self, EventCacheDropHandles, RoomEventCache},
     event_handler::{EventHandler, EventHandlerDropGuard, EventHandlerHandle, SyncEvent},
-    live_location::{LastLocation, LiveLocationShare},
+    live_location_share::{LastLocation, LiveLocationShare},
     media::{MediaFormat, MediaRequest},
     notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode},
     room::power_levels::{RoomPowerLevelChanges, RoomPowerLevelsExt},
@@ -3185,16 +3185,28 @@ impl Room {
 
         let client = self.client.clone();
         let room_id = self.room_id().to_owned();
+        let room = self.clone();
 
         let handle: JoinHandle<()> = spawn(async move {
             let beacon_event_handler_handle = client.add_room_event_handler(&room_id, {
                 move |event: OriginalSyncBeaconEvent| async move {
+                    let user_id = event.sender;
+
+                    let beacon_info = match room.get_user_beacon_info(&user_id).await {
+                        Ok(info) => info.content,
+                        Err(e) => {
+                            eprintln!("Failed to get beacon info: {:?}", e);
+                            return;
+                        }
+                    };
+
                     let live_location_share = LiveLocationShare {
-                        user_id: event.sender,
+                        user_id: user_id.clone(),
                         last_location: LastLocation {
                             location: event.content.location,
                             ts: event.content.ts,
                         },
+                        beacon_info,
                     };
 
                     // Send the live location update to all subscribers.
