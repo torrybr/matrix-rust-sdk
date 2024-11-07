@@ -36,6 +36,7 @@ use crate::{
     error::{ClientError, MediaInfoError, RoomError},
     event::{MessageLikeEventType, RoomMessageEventMessageType, StateEventType},
     identity_status_change::IdentityStatusChange,
+    live_location_share::{LiveLocationShare, LastLocation},
     room_info::RoomInfo,
     room_member::RoomMember,
     ruma::{ImageInfo, Mentions, NotifyType},
@@ -43,6 +44,7 @@ use crate::{
     utils::u64_to_uint,
     TaskHandle,
 };
+use crate::ruma::LocationContent;
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Membership {
@@ -676,6 +678,36 @@ impl Room {
         })))
     }
 
+    pub fn subscribe_to_live_location_shares(
+        self: Arc<Self>,
+        listener: Box<dyn LiveLocationShareListener>,
+    ) -> Arc<TaskHandle> {
+        Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
+            let (_event_handler_drop_guard, mut subscriber) =
+                self.inner.subscribe_to_live_location_shares();
+
+            while let Ok(location) = subscriber.recv().await {
+                let last_location = LocationContent {
+                    body: "".to_string(),
+                    geo_uri: location.last_location.location.uri.clone().to_string(),
+                    description: None,
+                    zoom_level: None,
+                    asset: None,
+                };
+
+                let tst = LiveLocationShare {
+                    last_location: LastLocation {
+                        location: last_location,
+                    },
+                    is_live: location.beacon_info.is_live(),
+                    user_id: location.user_id.to_string(),
+                };
+
+                listener.call(tst);
+            }
+        })))
+    }
+
     /// Set (or unset) a flag on the room to indicate that the user has
     /// explicitly marked it as unread.
     pub async fn set_unread_flag(&self, new_value: bool) -> Result<(), ClientError> {
@@ -983,6 +1015,11 @@ pub trait TypingNotificationsListener: Sync + Send {
 #[matrix_sdk_ffi_macros::export(callback_interface)]
 pub trait IdentityStatusChangeListener: Sync + Send {
     fn call(&self, identity_status_change: Vec<IdentityStatusChange>);
+}
+
+#[matrix_sdk_ffi_macros::export(callback_interface)]
+pub trait LiveLocationShareListener: Sync + Send {
+    fn call(&self, live_location_shares: LiveLocationShare);
 }
 
 #[derive(uniffi::Object)]
