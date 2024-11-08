@@ -36,7 +36,7 @@ use crate::{
     error::{ClientError, MediaInfoError, RoomError},
     event::{MessageLikeEventType, RoomMessageEventMessageType, StateEventType},
     identity_status_change::IdentityStatusChange,
-    live_location_share::{LiveLocationShare, LastLocation},
+    live_location_share::{LastLocation, LiveLocationShare},
     room_info::RoomInfo,
     room_member::RoomMember,
     ruma::{ImageInfo, Mentions, NotifyType},
@@ -44,7 +44,6 @@ use crate::{
     utils::u64_to_uint,
     TaskHandle,
 };
-use crate::ruma::LocationContent;
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Membership {
@@ -677,9 +676,7 @@ impl Room {
                 };
 
                 let tst = LiveLocationShare {
-                    last_location: LastLocation {
-                        location: last_location,
-                    },
+                    last_location: LastLocation { location: last_location },
                     is_live: location.beacon_info.is_live(),
                     user_id: location.user_id.to_string(),
                 };
