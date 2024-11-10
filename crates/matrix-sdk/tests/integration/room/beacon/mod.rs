@@ -216,53 +216,63 @@ async fn test_subscribe_to_live_location_shares() {
 
     let (task_handle, mut subscriber) = room.subscribe_to_live_location_shares();
 
-    sync_builder.add_joined_room(JoinedRoomBuilder::new(*DEFAULT_TEST_ROOM_ID).add_timeline_event(
-        sync_timeline_event!({
-           "content": {
+    let mut timeline_events = Vec::new();
+
+    for i in 0..75 {
+        timeline_events.push(sync_timeline_event!({
+            "content": {
                 "m.relates_to": {
-                  "event_id": "$TlS7h0NHzBdZIccsSspF5CMpQE8YMT0stRern0nXscI",
-                  "rel_type": "m.reference"
+                    "event_id": "$TlS7h0NHzBdZIccsSspF5CMpQE8YMT0stRern0nXscI",
+                    "rel_type": "m.reference"
                 },
                 "org.matrix.msc3488.location": {
-                  "uri": "geo:8.95752746197222,12.494122581370175;u=10"
+                    "uri": format!("geo:{}.9575274619722,12.494122581370175;u={}", i, i)
                 },
                 "org.matrix.msc3488.ts": 1_636_829_458
             },
-            "event_id": "$152037280074GZeOm:localhost",
+            "event_id": format!("$152037280074GZeOm:localhost{}", i),
             "origin_server_ts": 1_636_829_458,
             "sender": "@example:localhost",
             "type": "org.matrix.msc3672.beacon",
             "unsigned": {
                 "age": 598971
             }
-        }),
-    ));
+        }));
+    }
+
+    sync_builder.add_joined_room(
+        JoinedRoomBuilder::new(*DEFAULT_TEST_ROOM_ID).add_timeline_bulk(timeline_events.clone()),
+    );
+
     mock_sync(&server, sync_builder.build_json_sync_response(), None).await;
     let _response = client.sync_once(sync_settings.clone()).await.unwrap();
     server.reset().await;
 
-    let live_location_share =
-        subscriber.recv().await.expect("Failed to receive live location share");
+    for i in 0..timeline_events.len() {
+        let live_location_share =
+            subscriber.recv().await.expect("Failed to receive live location share");
 
-    assert_eq!(live_location_share.user_id.to_string(), "@example:localhost");
+        assert_eq!(live_location_share.user_id.to_string(), "@example:localhost");
 
-    assert_eq!(
-        live_location_share.last_location.location.uri,
-        "geo:8.95752746197222,12.494122581370175;u=10"
-    );
-    assert!(live_location_share.last_location.location.description.is_none());
-    assert!(live_location_share.last_location.location.zoom_level.is_none());
-    assert_eq!(
-        live_location_share.last_location.ts,
-        MilliSecondsSinceUnixEpoch(uint!(1_636_829_458))
-    );
+        assert_eq!(
+            live_location_share.last_location.location.uri,
+            format!("geo:{}.9575274619722,12.494122581370175;u={}", i, i)
+        );
 
-    assert!(live_location_share.beacon_info.live);
-    assert!(live_location_share.beacon_info.is_live());
-    assert_eq!(live_location_share.beacon_info.description, Some("Live Share".to_owned()));
-    assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
-    assert_eq!(live_location_share.beacon_info.ts, current_time);
-    assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
+        assert!(live_location_share.last_location.location.description.is_none());
+        assert!(live_location_share.last_location.location.zoom_level.is_none());
+        assert_eq!(
+            live_location_share.last_location.ts,
+            MilliSecondsSinceUnixEpoch(uint!(1_636_829_458))
+        );
+
+        assert!(live_location_share.beacon_info.live);
+        assert!(live_location_share.beacon_info.is_live());
+        assert_eq!(live_location_share.beacon_info.description, Some("Live Share".to_owned()));
+        assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
+        assert_eq!(live_location_share.beacon_info.ts, current_time);
+        assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
+    }
 
     task_handle.await.unwrap();
 }
@@ -342,9 +352,9 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
 
     let (task_handle, mut subscriber) = room.subscribe_to_live_location_shares();
 
-    sync_builder.add_joined_room(
-        JoinedRoomBuilder::new(*DEFAULT_TEST_ROOM_ID)
-            .add_timeline_event(sync_timeline_event!({
+    sync_builder.add_joined_room(JoinedRoomBuilder::new(*DEFAULT_TEST_ROOM_ID).add_timeline_bulk(
+        [
+            sync_timeline_event!({
                "content": {
                     "m.relates_to": {
                       "event_id": "$TlS7h0NHzBdZIccsSspF5CMpQE8YMT0stRern0nXscI",
@@ -362,8 +372,8 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
                 "unsigned": {
                     "age": 598971
                 }
-            }))
-            .add_timeline_event(sync_timeline_event!({
+            }),
+            sync_timeline_event!({
                "content": {
                     "m.relates_to": {
                       "event_id": "$TlS7h0NHzBdZIccsSspF5CMpQE8YMT0stRern0nXscI",
@@ -381,8 +391,9 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
                 "unsigned": {
                     "age": 598971
                 }
-            })),
-    );
+            }),
+        ],
+    ));
 
     mock_sync(&server, sync_builder.build_json_sync_response(), None).await;
     let _response = client.sync_once(sync_settings.clone()).await.unwrap();
