@@ -675,13 +675,12 @@ impl Room {
                     asset: None,
                 };
 
-                let tst = LiveLocationShare {
+                /// TODO (tb): a total hack to get the android flow working.
+                listener.call(vec![LiveLocationShare {
                     last_location: LastLocation { location: last_location },
                     is_live: location.beacon_info.is_live(),
                     user_id: location.user_id.to_string(),
-                };
-
-                listener.call(tst);
+                }]);
             }
         })))
     }
@@ -987,7 +986,7 @@ pub trait IdentityStatusChangeListener: Sync + Send {
 
 #[matrix_sdk_ffi_macros::export(callback_interface)]
 pub trait LiveLocationShareListener: Sync + Send {
-    fn call(&self, live_location_shares: LiveLocationShare);
+    fn call(&self, live_location_shares: Vec<LiveLocationShare>);
 }
 
 #[derive(uniffi::Object)]
