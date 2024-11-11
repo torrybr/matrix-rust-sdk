@@ -3177,11 +3177,10 @@ impl Room {
     pub fn subscribe_to_live_location_shares(&self) -> LiveLocationSubscription {
         let (sender, receiver) = broadcast::channel(128);
 
-        let client = self.client.clone();
         let room_id = self.room_id().to_owned();
         let room = self.clone();
 
-        let beacon_event_handler_handle = client.add_room_event_handler(&room_id, {
+        let beacon_event_handler_handle = self.client.add_room_event_handler(&room_id, {
             move |event: OriginalSyncBeaconEvent| async move {
                 let user_id = event.sender;
 
