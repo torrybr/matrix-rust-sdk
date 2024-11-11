@@ -3177,7 +3177,7 @@ impl Room {
     /// Subscribe to live location sharing events for this room.
     ///
     /// The returned receiver will receive a new event for each sync response
-    /// that contains a 'm.beacon' event.
+    /// that contains a `m.beacon` event.
     pub fn subscribe_to_live_location_shares(
         &self,
     ) -> (JoinHandle<()>, broadcast::Receiver<LiveLocationShare>) {
@@ -3209,7 +3209,6 @@ impl Room {
                         beacon_info,
                     };
 
-                    // Send the live location update to all subscribers.
                     let _ = sender.send(live_location_share);
                 }
             });
