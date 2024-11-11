@@ -3212,28 +3212,27 @@ impl Room {
         let handle: JoinHandle<()> = spawn(async move {
             let beacon_event_handler_handle = client.add_room_event_handler(&room_id, {
                 move |event: OriginalSyncBeaconEvent| async move {
+                    warn!("TORRY: Received beacon event from {:?}", event);
+
                     let user_id = event.sender;
-                    print!("Received beacon event from {}", user_id);
 
                     let beacon_info = match room.get_user_beacon_info(&user_id).await {
                         Ok(info) => info.content,
                         Err(e) => {
-                            eprintln!("Failed to get beacon info: {:?}", e);
+                            warn!("TORRY: Failed to find related beacon_info event for beacon: {:?}", e);
                             return;
                         }
                     };
 
-                    let live_location_share = LiveLocationShare {
-                        user_id: user_id.clone(),
+                    let _ = sender.send(LiveLocationShare {
                         last_location: LastLocation {
                             location: event.content.location,
                             ts: event.content.ts,
                         },
+                        user_id,
                         beacon_info,
-                    };
-
-                    // Send the live location update to all subscribers.
-                    let _ = sender.send(live_location_share);
+                    });
+                    info!("TORRY: Sent beacon event to subscribers");
                 }
             });
 

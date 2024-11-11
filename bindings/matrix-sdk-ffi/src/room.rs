@@ -28,7 +28,7 @@ use ruma::{
     EventId, Int, OwnedDeviceId, OwnedUserId, RoomAliasId, UserId,
 };
 use tokio::sync::RwLock;
-use tracing::error;
+use tracing::{error, info, log::warn};
 
 use super::RUNTIME;
 use crate::{
@@ -659,12 +659,15 @@ impl Room {
     }
 
     pub fn subscribe_to_live_location_shares(
-        self: Arc<Self>,
+        &self,
         listener: Box<dyn LiveLocationShareListener>,
     ) -> Arc<TaskHandle> {
+        let room = self.inner.clone();
+
         Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
-            let (_event_handler_drop_guard, mut subscriber) =
-                self.inner.subscribe_to_live_location_shares();
+            let (task_handle, mut subscriber) = room.subscribe_to_live_location_shares();
+
+            info!("TORRY: Subscribed to live location shares");
 
             while let Ok(location) = subscriber.recv().await {
                 let last_location = LocationContent {
@@ -675,12 +678,17 @@ impl Room {
                     asset: None,
                 };
 
-                /// TODO (tb): a total hack to get the android flow working.
+                warn!("TORRY: FFI recieved event: {:?}", location);
+
                 listener.call(vec![LiveLocationShare {
                     last_location: LastLocation { location: last_location },
                     is_live: location.beacon_info.is_live(),
                     user_id: location.user_id.to_string(),
                 }]);
+            }
+
+            if let Err(e) = task_handle.await {
+                error!("TORRY: Error in live location share task: {:?}", e);
             }
         })))
     }

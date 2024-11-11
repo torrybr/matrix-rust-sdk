@@ -217,7 +217,7 @@ async fn test_subscribe_to_live_location_shares() {
     let (task_handle, mut subscriber) = room.subscribe_to_live_location_shares();
 
     let mut timeline_events = Vec::new();
-    
+
     for i in 0..75 {
         timeline_events.push(sync_timeline_event!({
             "content": {
