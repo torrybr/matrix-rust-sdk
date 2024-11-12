@@ -25,8 +25,10 @@ use ruma::{
     },
     MilliSecondsSinceUnixEpoch, OwnedUserId, RoomId,
 };
+use tokio::sync::broadcast;
 
 use crate::{event_handler::ObservableEventHandler, Client, Room};
+use crate::event_handler::EventHandlerHandle;
 
 /// An observable live location.
 #[derive(Debug)]
@@ -80,4 +82,20 @@ pub struct LiveLocationShare {
     pub beacon_info: Option<BeaconInfoEventContent>,
     /// The user ID of the person sharing their live location.
     pub user_id: OwnedUserId,
+}
+
+/// A subscription to live location sharing events.
+///
+/// This struct holds the `EventHandlerHandle` and the
+/// `Receiver<LiveLocationShare>` for live location shares.
+#[derive(Debug)]
+pub struct LiveLocationSubscription {
+    /// Manages the event handler lifecycle.
+    pub event_handler_handle: EventHandlerHandle,
+    /// Receives live location shares.
+    pub receiver: broadcast::Receiver<LiveLocationShare>,
+}
+
+impl Drop for LiveLocationSubscription {
+    fn drop(&mut self) {}
 }

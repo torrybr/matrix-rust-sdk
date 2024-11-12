@@ -684,11 +684,11 @@ impl Room {
         let room = self.inner.clone();
 
         Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
-            let (task_handle, mut subscriber) = room.subscribe_to_live_location_shares();
+            let mut subscription = room.subscribe_to_live_location_shares();
 
             info!("TORRY: Subscribed to live location shares");
 
-            while let Ok(location) = subscriber.recv().await {
+            while let Ok(location) = subscription.receiver.recv().await {
                 let last_location = LocationContent {
                     body: "".to_string(),
                     geo_uri: location.last_location.location.uri.clone().to_string(),
@@ -704,10 +704,6 @@ impl Room {
                     is_live: location.beacon_info.is_live(),
                     user_id: location.user_id.to_string(),
                 }]);
-            }
-
-            if let Err(e) = task_handle.await {
-                error!("TORRY: Error in live location share task: {:?}", e);
             }
         })))
     }
