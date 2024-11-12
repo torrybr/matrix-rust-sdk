@@ -139,7 +139,7 @@ use crate::{
     error::{BeaconError, WrongRoomState},
     event_cache::{self, EventCacheDropHandles, RoomEventCache},
     event_handler::{EventHandler, EventHandlerDropGuard, EventHandlerHandle, SyncEvent},
-    live_location_share::{LastLocation, LiveLocationShare},
+    live_location_share::{LastLocation, LiveLocationShare, LiveLocationSubscription},
     media::{MediaFormat, MediaRequestParameters},
     notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode},
     room::power_levels::{RoomPowerLevelChanges, RoomPowerLevelsExt},
@@ -3200,46 +3200,40 @@ impl Room {
     ///
     /// The returned receiver will receive a new event for each sync response
     /// that contains a 'm.beacon' event.
-    pub fn subscribe_to_live_location_shares(
-        &self,
-    ) -> (JoinHandle<()>, broadcast::Receiver<LiveLocationShare>) {
+    pub fn subscribe_to_live_location_shares(&self) -> LiveLocationSubscription {
         let (sender, receiver) = broadcast::channel(128);
 
-        let client = self.client.clone();
         let room_id = self.room_id().to_owned();
         let room = self.clone();
 
-        let handle: JoinHandle<()> = spawn(async move {
-            let beacon_event_handler_handle = client.add_room_event_handler(&room_id, {
-                move |event: OriginalSyncBeaconEvent| async move {
-                    warn!("TORRY: Received beacon event from {:?}", event);
+        let beacon_event_handler_handle = self.client.add_room_event_handler(&room_id, {
+            move |event: OriginalSyncBeaconEvent| async move {
+                let user_id = event.sender;
 
-                    let user_id = event.sender;
+                let beacon_info = match room.get_user_beacon_info(&user_id).await {
+                    Ok(info) => info.content,
+                    Err(e) => {
+                        warn!(user_id = ?user_id, "TORRY: Failed to get beacon info: {:?}", e);
+                        return;
+                    }
+                };
 
-                    let beacon_info = match room.get_user_beacon_info(&user_id).await {
-                        Ok(info) => info.content,
-                        Err(e) => {
-                            warn!("TORRY: Failed to find related beacon_info event for beacon: {:?}", e);
-                            return;
-                        }
-                    };
+                let live_location_share = LiveLocationShare {
+                    last_location: LastLocation {
+                        location: event.content.location,
+                        ts: event.content.ts,
+                    },
+                    user_id,
+                    beacon_info,
+                };
 
-                    let _ = sender.send(LiveLocationShare {
-                        last_location: LastLocation {
-                            location: event.content.location,
-                            ts: event.content.ts,
-                        },
-                        user_id,
-                        beacon_info,
-                    });
-                    info!("TORRY: Sent beacon event to subscribers");
-                }
-            });
+                warn!("Returning live location share {:?}", live_location_share);
 
-            let _ = beacon_event_handler_handle;
+                let _ = sender.send(live_location_share);
+            }
         });
 
-        (handle, receiver)
+        LiveLocationSubscription { event_handler_handle: beacon_event_handler_handle, receiver }
     }
 }
 

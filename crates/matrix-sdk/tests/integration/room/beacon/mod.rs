@@ -214,7 +214,7 @@ async fn test_subscribe_to_live_location_shares() {
 
     let room = client.get_room(*DEFAULT_TEST_ROOM_ID).unwrap();
 
-    let (task_handle, mut subscriber) = room.subscribe_to_live_location_shares();
+    let mut subcription = room.subscribe_to_live_location_shares();
 
     let mut timeline_events = Vec::new();
 
@@ -250,7 +250,7 @@ async fn test_subscribe_to_live_location_shares() {
 
     for i in 0..timeline_events.len() {
         let live_location_share =
-            subscriber.recv().await.expect("Failed to receive live location share");
+            subcription.receiver.recv().await.expect("Failed to receive live location share");
 
         assert_eq!(live_location_share.user_id.to_string(), "@example:localhost");
 
@@ -273,8 +273,6 @@ async fn test_subscribe_to_live_location_shares() {
         assert_eq!(live_location_share.beacon_info.ts, current_time);
         assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
     }
-
-    task_handle.await.unwrap();
 }
 
 #[async_test]
@@ -350,7 +348,7 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
 
     let room = client.get_room(*DEFAULT_TEST_ROOM_ID).unwrap();
 
-    let (task_handle, mut subscriber) = room.subscribe_to_live_location_shares();
+    let mut subscription = room.subscribe_to_live_location_shares();
 
     sync_builder.add_joined_room(JoinedRoomBuilder::new(*DEFAULT_TEST_ROOM_ID).add_timeline_bulk(
         [
@@ -400,7 +398,7 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
     server.reset().await;
 
     let live_location_share =
-        subscriber.recv().await.expect("Failed to receive live location share");
+        subscription.receiver.recv().await.expect("Failed to receive live location share");
 
     assert_eq!(live_location_share.user_id.to_string(), "@user1:localhost");
 
@@ -423,7 +421,7 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
     assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
 
     let live_location_share =
-        subscriber.recv().await.expect("Failed to receive live location share");
+        subscription.receiver.recv().await.expect("Failed to receive live location share");
 
     assert_eq!(live_location_share.user_id.to_string(), "@user2:localhost");
 
@@ -444,6 +442,4 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
     assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
     assert_eq!(live_location_share.beacon_info.ts, current_time);
     assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
-
-    task_handle.await.unwrap();
 }
