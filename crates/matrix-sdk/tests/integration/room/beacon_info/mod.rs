@@ -68,13 +68,38 @@ async fn test_start_live_location_share_for_room() {
                                         "org.matrix.msc3488.asset": { "type": "m.self" }
                                     },
                                     "event_id": "$15139375514XsgmR:localhost",
+                                    "user_id": "@sierra:surkit.dev",
+                                    "age": 66422529,
+                                    "replaces_state": "$mjug5LVeh6DgVtEJirdg4rYt0P5lm-BsAi6yeI3gBjY",
                                     "origin_server_ts": 1_636_829_458,
                                     "sender": "@example:localhost",
                                     "state_key": "@example:localhost",
+                                    "room_id": *DEFAULT_TEST_ROOM_ID,
                                     "type": "org.matrix.msc3672.beacon_info",
+                                    "prev_content": {
+                                        "description": "Stopping Beacon for Sierra",
+                                        "live": false,
+                                        "org.matrix.msc3488.asset": {
+                                          "type": "m.self"
+                                        },
+                                        "org.matrix.msc3488.ts": 1_636_829_458,
+                                        "timeout": 3000
+                                    },
                                     "unsigned": {
-                                        "age": 7034220
-                                    }
+                                        "replaces_state": "$mjug5LVeh6DgVtEJirdg4rYt0P5lm-BsAi6yeI3gBjY",
+                                        "prev_content": {
+                                          "description": "Stopping Beacon for Sierra",
+                                          "live": false,
+                                          "org.matrix.msc3488.asset": {
+                                            "type": "m.self"
+                                          },
+                                          "org.matrix.msc3488.ts": 1_636_829_458,
+                                          "timeout": 3000
+                                        },
+                                        "prev_sender": "@sierra:surkit.dev",
+                                        "membership": "join",
+                                        "age": 66422529
+                                      },
                                 },
                             ]
                         }

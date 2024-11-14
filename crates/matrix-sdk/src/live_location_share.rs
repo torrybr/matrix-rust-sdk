@@ -14,13 +14,19 @@
 
 //! Types for live location sharing.
 
+use futures_core::Stream;
 use ruma::{
-    events::{beacon_info::BeaconInfoEventContent, location::LocationContent},
+    events::{
+        beacon_info::BeaconInfoEventContent,
+        location::LocationContent,
+    },
     MilliSecondsSinceUnixEpoch, OwnedUserId,
 };
+use ruma::events::beacon::OriginalSyncBeaconEvent;
 use tokio::sync::broadcast;
 
-use crate::event_handler::EventHandlerHandle;
+use crate::event_handler::{EventHandlerHandle, ObservableEventHandler};
+use crate::Room;
 
 /// Details of the last known location beacon.
 #[derive(Clone, Debug)]
@@ -42,18 +48,18 @@ pub struct LiveLocationShare {
     pub user_id: OwnedUserId,
 }
 
-/// A subscription to live location sharing events.
-///
-/// This struct holds the `EventHandlerHandle` and the
-/// `Receiver<LiveLocationShare>` for live location shares.
-#[derive(Debug)]
-pub struct LiveLocationSubscription {
-    /// Manages the event handler lifecycle.
-    pub event_handler_handle: EventHandlerHandle,
-    /// Receives live location shares.
-    pub receiver: broadcast::Receiver<LiveLocationShare>,
-}
+// /// A subscription to live location sharing events.
+// ///
+// /// This struct holds the `EventHandlerHandle` and the
+// /// `Receiver<LiveLocationShare>` for live location shares.
+// #[derive(Debug)]
+// pub struct LiveLocationSubscription {
+//     /// Manages the event handler lifecycle.
+//     pub observer: ObservableEventHandler<(OriginalSyncBeaconEvent, Room)>,
+//     pub subscription: dyn Stream<Item=LiveLocationShare>
+//
+// }
 
-impl Drop for LiveLocationSubscription {
-    fn drop(&mut self) {}
-}
+// impl Drop for LiveLocationSubscription {
+//     fn drop(&mut self) {}
+// }

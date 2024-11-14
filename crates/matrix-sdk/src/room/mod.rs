@@ -29,7 +29,9 @@ use futures_core::Stream;
 use futures_util::{
     future::{try_join, try_join_all},
     stream::FuturesUnordered,
+    StreamExt,
 };
+use futures_util::stream::Map;
 use http::StatusCode;
 #[cfg(all(feature = "e2e-encryption", not(target_arch = "wasm32")))]
 pub use identity_status_changes::IdentityStatusChanges;
@@ -79,7 +81,7 @@ use ruma::{
         beacon_info::BeaconInfoEventContent,
         call::notify::{ApplicationType, CallNotifyEventContent, NotifyType},
         direct::DirectEventContent,
-        location::LocationContent,
+        marked_unread::{MarkedUnreadEventContent, UnstableMarkedUnreadEventContent},
         receipt::{Receipt, ReceiptThread, ReceiptType},
         room::{
             avatar::{self, RoomAvatarEventContent},
@@ -113,6 +115,8 @@ use ruma::{
     EventId, Int, MatrixToUri, MatrixUri, MxcUri, OwnedEventId, OwnedRoomId, OwnedServerName,
     OwnedTransactionId, OwnedUserId, RoomId, TransactionId, UInt, UserId,
 };
+use ruma::events::beacon::SyncBeaconEvent;
+use ruma::events::TimelineEventType::Beacon;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -132,14 +136,15 @@ use crate::{
     error::{BeaconError, WrongRoomState},
     event_cache::{self, EventCacheDropHandles, RoomEventCache},
     event_handler::{EventHandler, EventHandlerDropGuard, EventHandlerHandle, SyncEvent},
-    live_location_share::{LastLocation, LiveLocationShare, LiveLocationSubscription},
-    media::{MediaFormat, MediaRequest},
+    live_location_share::{LastLocation, LiveLocationShare},
+    media::{MediaFormat, MediaRequestParameters},
     notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode},
     room::power_levels::{RoomPowerLevelChanges, RoomPowerLevelsExt},
     sync::RoomUpdate,
     utils::{IntoRawMessageLikeEventContent, IntoRawStateEventContent},
     BaseRoom, Client, Error, HttpResult, Result, RoomState, TransmissionProgress,
 };
+use crate::event_handler::{EventHandlerSubscriber, ObservableEventHandler};
 
 pub mod edit;
 pub mod futures;
@@ -3143,7 +3148,6 @@ impl Room {
         Ok(())
     }
 
-<<<<<<< HEAD
     /// Load pinned state events for a room from the `/state` endpoint in the
     /// home server.
     pub async fn load_pinned_events(&self) -> Result<Option<Vec<OwnedEventId>>> {
@@ -3170,11 +3174,49 @@ impl Room {
         }
     }
 
+    pub async fn stream_live_location_shares(&self) -> impl Stream<Item = LiveLocationShare> {
+        let observer = self.client.observe_events::<OriginalSyncBeaconEvent, Room>();
+        let subscriber = observer.subscribe();
+        println!("streaming");
+
+        subscriber.map(|(event, room)|  {
+            // println!("Event: {:?}", event);
+            LiveLocationShare {
+                last_location: LastLocation {
+                    location: event.content.location,
+                    ts: event.content.ts,
+                },
+                user_id: event.sender,
+                beacon_info: BeaconInfoEventContent::new(None, Duration::from_millis(0), true, None),
+            }
+        })
+    }
+
+    pub fn stream2_live_location_shares(&self) -> (ObservableEventHandler<(OriginalSyncBeaconEvent, Room)>, impl Stream<Item = LiveLocationShare>) {
+        let observer = self.client.observe_events::<OriginalSyncBeaconEvent, Room>();
+        let subscriber = observer.subscribe().map(|(event, room)|  {
+            println!("Event: {:?}", event);
+
+            LiveLocationShare {
+                last_location: LastLocation {
+                    location: event.content.location,
+                    ts: event.content.ts,
+                },
+                user_id: event.sender,
+                beacon_info: BeaconInfoEventContent::new(None, Duration::from_millis(0), true, None),
+            }
+        });
+
+        (observer, subscriber)
+    }
+
     /// Subscribe to live location sharing events for this room.
     ///
     /// The returned receiver will receive a new event for each sync response
     /// that contains a `m.beacon` event.
-    pub fn subscribe_to_live_location_shares(&self) -> LiveLocationSubscription {
+    pub fn subscribe_to_live_location_shares(
+        &self,
+    ) -> (EventHandlerDropGuard, broadcast::Receiver<LiveLocationShare>) {
         let (sender, receiver) = broadcast::channel(128);
 
         let room_id = self.room_id().to_owned();
@@ -3205,7 +3247,8 @@ impl Room {
             }
         });
 
-        LiveLocationSubscription { event_handler_handle: beacon_event_handler_handle, receiver }
+        let drop_guard = self.client().event_handler_drop_guard(beacon_event_handler_handle);
+        (drop_guard, receiver)
     }
 }
 

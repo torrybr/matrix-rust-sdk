@@ -1,5 +1,5 @@
 use std::time::{Duration, UNIX_EPOCH};
-
+use futures_util::{FutureExt, StreamExt};
 use js_int::uint;
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk_test::{
@@ -7,12 +7,14 @@ use matrix_sdk_test::{
     SyncResponseBuilder, DEFAULT_TEST_ROOM_ID,
 };
 use ruma::{event_id, events::location::AssetType, time::SystemTime, MilliSecondsSinceUnixEpoch};
+use ruma::events::beacon::OriginalSyncBeaconEvent;
 use serde_json::json;
+use stream_assert::assert_ready;
 use wiremock::{
     matchers::{body_partial_json, header, method, path_regex},
     Mock, ResponseTemplate,
 };
-
+use matrix_sdk::Room;
 use crate::{logged_in_client_with_server, mock_sync};
 #[async_test]
 async fn test_send_location_beacon() {
@@ -214,7 +216,7 @@ async fn test_subscribe_to_live_location_shares() {
 
     let room = client.get_room(*DEFAULT_TEST_ROOM_ID).unwrap();
 
-    let mut subscription = room.subscribe_to_live_location_shares();
+    let (_, mut receiver) = room.subscribe_to_live_location_shares();
 
     let mut timeline_events = Vec::new();
 
@@ -250,7 +252,7 @@ async fn test_subscribe_to_live_location_shares() {
 
     for i in 0..timeline_events.len() {
         let live_location_share =
-            subscription.receiver.recv().await.expect("Failed to receive live location share");
+            receiver.recv().await.expect("Failed to receive live location share");
 
         assert_eq!(live_location_share.user_id.to_string(), "@example:localhost");
 
@@ -348,7 +350,7 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
 
     let room = client.get_room(*DEFAULT_TEST_ROOM_ID).unwrap();
 
-    let mut subscription = room.subscribe_to_live_location_shares();
+    let (_drop_guard, mut receiver) = room.subscribe_to_live_location_shares();
 
     sync_builder.add_joined_room(JoinedRoomBuilder::new(*DEFAULT_TEST_ROOM_ID).add_timeline_bulk(
         [
@@ -397,8 +399,7 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
     let _response = client.sync_once(sync_settings.clone()).await.unwrap();
     server.reset().await;
 
-    let live_location_share =
-        subscription.receiver.recv().await.expect("Failed to receive live location share");
+    let live_location_share = receiver.recv().await.expect("Failed to receive live location share");
 
     assert_eq!(live_location_share.user_id.to_string(), "@user1:localhost");
 
@@ -420,8 +421,7 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
     assert_eq!(live_location_share.beacon_info.ts, current_time);
     assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
 
-    let live_location_share =
-        subscription.receiver.recv().await.expect("Failed to receive live location share");
+    let live_location_share = receiver.recv().await.expect("Failed to receive live location share");
 
     assert_eq!(live_location_share.user_id.to_string(), "@user2:localhost");
 
@@ -442,4 +442,202 @@ async fn test_subscribe_to_live_location_shares_with_multiple_users() {
     assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
     assert_eq!(live_location_share.beacon_info.ts, current_time);
     assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
+}
+
+#[async_test]
+async fn test_stream_live_location_shares_with_multiple_users() {
+    let (client, server) = logged_in_client_with_server().await;
+
+    let mut sync_builder = SyncResponseBuilder::new();
+
+    let current_time = MilliSecondsSinceUnixEpoch::now();
+    let millis_time = current_time
+        .to_system_time()
+        .unwrap()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis() as u64;
+
+    mock_sync(
+        &server,
+        json!({
+            "next_batch": "s526_47314_0_7_1_1_1_1_1",
+            "rooms": {
+                "join": {
+                    *DEFAULT_TEST_ROOM_ID: {
+                        "state": {
+                            "events": [
+                                {
+                                    "content": {
+                                        "description": "Live Share",
+                                        "live": true,
+                                        "org.matrix.msc3488.ts": millis_time,
+                                        "timeout": 3000,
+                                        "org.matrix.msc3488.asset": { "type": "m.self" }
+                                    },
+                                    "event_id": "$15139375514XsgmR:localhost",
+                                    "origin_server_ts": millis_time,
+                                    "sender": "@user1:localhost",
+                                    "state_key": "@user1:localhost",
+                                    "type": "org.matrix.msc3672.beacon_info",
+                                    "unsigned": {
+                                        "age": 7034220
+                                    }
+                                },
+                               {
+                                "content": {
+                                    "description": "Live Share",
+                                    "live": true,
+                                    "org.matrix.msc3488.ts": millis_time,
+                                    "timeout": 3000,
+                                    "org.matrix.msc3488.asset": { "type": "m.self" }
+                                },
+                                "event_id": "$16139375514XsgmR:localhost",
+                                "origin_server_ts": millis_time,
+                                "sender": "@user2:localhost",
+                                "state_key": "@user2:localhost",
+                                "type": "org.matrix.msc3672.beacon_info",
+                                "unsigned": {
+                                    "age": 7034220
+                                }
+                            }
+                            ]
+                        }
+                    }
+                }
+            }
+
+        }),
+        None,
+    )
+        .await;
+    let sync_settings = SyncSettings::new().timeout(Duration::from_millis(3000));
+    let _response = client.sync_once(sync_settings.clone()).await.unwrap();
+    server.reset().await;
+
+    let room = client.get_room(*DEFAULT_TEST_ROOM_ID).unwrap();
+
+    let observer = client.observe_events::<OriginalSyncBeaconEvent, Room>();
+    let mut subscriber = observer.subscribe();
+
+    let (observer, mut stream_subscription) = room.stream2_live_location_shares();
+
+    sync_builder.add_joined_room(JoinedRoomBuilder::new(*DEFAULT_TEST_ROOM_ID).add_timeline_bulk(
+        [
+            sync_timeline_event!({
+               "content": {
+                    "m.relates_to": {
+                      "event_id": "$TlS7h0NHzBdZIccsSspF5CMpQE8YMT0stRern0nXscI",
+                      "rel_type": "m.reference"
+                    },
+                    "org.matrix.msc3488.location": {
+                      "uri": "geo:8.95752746197222,12.494122581370175;u=10"
+                    },
+                    "org.matrix.msc3488.ts": 1_636_829_458
+                },
+
+                "event_id": "$152037280074GZeOm:localhost",
+                "origin_server_ts": 1_636_829_458,
+                "sender": "@user1:localhost",
+                "type": "org.matrix.msc3672.beacon",
+                "unsigned": {
+                    "age": 598971
+                }
+            }),
+            sync_timeline_event!({
+               "content": {
+                    "m.relates_to": {
+                      "event_id": "$TlS7h0NHzBdZIccsSspF5CMpQE8YMT0stRern0nXscI",
+                      "rel_type": "m.reference"
+                    },
+                    "org.matrix.msc3488.location": {
+                      "uri": "geo:9.95752746197222,13.494122581370175;u=10"
+                    },
+                    "org.matrix.msc3488.ts": 1_636_829_458
+                },
+                "event_id": "$162037280074GZeOm:localhost",
+                "origin_server_ts": 1_636_829_458,
+                "sender": "@user2:localhost",
+                "type": "org.matrix.msc3672.beacon",
+                "unsigned": {
+                    "age": 598971
+                }
+            }),
+        ],
+    ));
+
+    mock_sync(&server, sync_builder.build_json_sync_response(), None).await;
+    client.sync_once(sync_settings.clone()).await.unwrap();
+
+
+    let mut subscription = subscriber.map(|(event, room)| {
+        println!("EVENT {:?}", event);
+        event.sender
+    });
+    let mut user2 = subscription.next().await;
+    println!("Sender ID: {:?}", user2);
+
+    let mut user1 = stream_subscription.next().await;
+    println!("USER 1: {:?}", user1);
+
+    // let mut user1 = subscriber.next().await;
+
+    // while let Some(event) = subscriber.next().await {
+    //     println!("EVENT {:?}", event);
+    // }
+
+
+    // let Some(sender_id) = test_stream.next().await;
+
+
+
+
+    // assert_eq!(beacon.event_id.as_str(), "$162037280074GZeOm:localhost");
+
+    // while let update = test_stream.next().await {
+    //     print!("{:?}", update);
+    // }
+
+
+    // assert_eq!(live_location_share.user_id.to_string(), "@user1:localhost");
+    //
+    // assert_eq!(
+    //     live_location_share.last_location.location.uri,
+    //     "geo:8.95752746197222,12.494122581370175;u=10"
+    // );
+    // assert!(live_location_share.last_location.location.description.is_none());
+    // assert!(live_location_share.last_location.location.zoom_level.is_none());
+    // assert_eq!(
+    //     live_location_share.last_location.ts,
+    //     MilliSecondsSinceUnixEpoch(uint!(1_636_829_458))
+    // );
+    //
+    // assert!(live_location_share.beacon_info.live);
+    // assert!(live_location_share.beacon_info.is_live());
+    // assert_eq!(live_location_share.beacon_info.description, Some("Live Share".to_owned()));
+    // assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
+    // assert_eq!(live_location_share.beacon_info.ts, current_time);
+    // assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
+    //
+    // let live_location_share = stream.next().await.unwrap().expect("Failed to receive live location share");
+    //
+    // assert_eq!(live_location_share.user_id.to_string(), "@user2:localhost");
+    //
+    // assert_eq!(
+    //     live_location_share.last_location.location.uri,
+    //     "geo:9.95752746197222,13.494122581370175;u=10"
+    // );
+    // assert!(live_location_share.last_location.location.description.is_none());
+    // assert!(live_location_share.last_location.location.zoom_level.is_none());
+    // assert_eq!(
+    //     live_location_share.last_location.ts,
+    //     MilliSecondsSinceUnixEpoch(uint!(1_636_829_458))
+    // );
+    //
+    // assert!(live_location_share.beacon_info.live);
+    // assert!(live_location_share.beacon_info.is_live());
+    // assert_eq!(live_location_share.beacon_info.description, Some("Live Share".to_owned()));
+    // assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
+    // assert_eq!(live_location_share.beacon_info.ts, current_time);
+    // assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
 }
