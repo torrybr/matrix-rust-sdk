@@ -75,7 +75,7 @@ use ruma::{
     },
     assign,
     events::{
-        beacon::{BeaconEventContent, OriginalSyncBeaconEvent},
+        beacon::BeaconEventContent,
         beacon_info::BeaconInfoEventContent,
         call::notify::{ApplicationType, CallNotifyEventContent, NotifyType},
         direct::DirectEventContent,
@@ -132,7 +132,7 @@ use crate::{
     error::{BeaconError, WrongRoomState},
     event_cache::{self, EventCacheDropHandles, RoomEventCache},
     event_handler::{EventHandler, EventHandlerDropGuard, EventHandlerHandle, SyncEvent},
-    live_location_share::{LastLocation, LiveLocationShare},
+    live_location_share::ObservableLiveLocation,
     media::{MediaFormat, MediaRequestParameters},
     notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode},
     room::power_levels::{RoomPowerLevelChanges, RoomPowerLevelsExt},
@@ -2997,7 +2997,7 @@ impl Room {
     ///
     /// Returns an error if the event is redacted, stripped, not found or could
     /// not be deserialized.
-    async fn get_user_beacon_info(
+    pub(crate) async fn get_user_beacon_info(
         &self,
         user_id: &UserId,
     ) -> Result<OriginalSyncStateEvent<BeaconInfoEventContent>, BeaconError> {
@@ -3087,6 +3087,11 @@ impl Room {
         }
     }
 
+    /// Observe live location shares.
+    pub fn observe_live_location_share(&self) -> ObservableLiveLocation {
+        ObservableLiveLocation::new(&self.client, self.room_id())
+    }
+
     /// Send a call notification event in the current room.
     ///
     /// This is only supposed to be used in **custom** situations where the user
@@ -3167,47 +3172,6 @@ impl Room {
                 _ => Err(http_error.into()),
             },
         }
-    }
-
-    /// Subscribe to live location sharing events for this room.
-    ///
-    /// The returned receiver will receive a new event for each sync response
-    /// that contains a `m.beacon` event.
-    pub fn subscribe_to_live_location_shares(
-        &self,
-    ) -> (EventHandlerDropGuard, broadcast::Receiver<LiveLocationShare>) {
-        let (sender, receiver) = broadcast::channel(128);
-
-        let room_id = self.room_id().to_owned();
-        let room = self.clone();
-
-        let beacon_event_handler_handle = self.client.add_room_event_handler(&room_id, {
-            move |event: OriginalSyncBeaconEvent| async move {
-                let user_id = event.sender;
-
-                let beacon_info = match room.get_user_beacon_info(&user_id).await {
-                    Ok(info) => info.content,
-                    Err(e) => {
-                        eprintln!("Failed to get beacon info: {:?}", e);
-                        return;
-                    }
-                };
-
-                let live_location_share = LiveLocationShare {
-                    last_location: LastLocation {
-                        location: event.content.location,
-                        ts: event.content.ts,
-                    },
-                    user_id,
-                    beacon_info,
-                };
-
-                let _ = sender.send(live_location_share);
-            }
-        });
-
-        let drop_guard = self.client().event_handler_drop_guard(beacon_event_handler_handle);
-        (drop_guard, receiver)
     }
 }
 

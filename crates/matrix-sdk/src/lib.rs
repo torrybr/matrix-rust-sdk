@@ -94,7 +94,7 @@ pub use sliding_sync::{
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
 
-mod live_location_share;
+pub mod live_location_share;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 

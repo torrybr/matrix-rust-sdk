@@ -14,10 +14,52 @@
 
 //! Types for live location sharing.
 
+use async_stream::stream;
 use ruma::{
-    events::{beacon_info::BeaconInfoEventContent, location::LocationContent},
-    MilliSecondsSinceUnixEpoch, OwnedUserId,
+    events::{
+        beacon::OriginalSyncBeaconEvent, beacon_info::BeaconInfoEventContent,
+        location::LocationContent,
+    },
+    MilliSecondsSinceUnixEpoch, OwnedUserId, RoomId,
 };
+
+use crate::{event_handler::ObservableEventHandler, Client, Room};
+use futures_util::Stream;
+
+/// An observable live location.
+#[derive(Debug)]
+pub struct ObservableLiveLocation {
+    observable_room_events: ObservableEventHandler<(OriginalSyncBeaconEvent, Room)>,
+}
+
+impl ObservableLiveLocation {
+    /// Create a new `ObservableLiveLocation` for a particular room.
+    pub(crate) fn new(client: &Client, room_id: &RoomId) -> Self {
+        Self { observable_room_events: client.observe_room_events(room_id) }
+    }
+
+    /// Get a stream of [`LiveLocationShare`].
+    pub fn subscribe(&self) -> impl Stream<Item = LiveLocationShare> {
+        let stream = self.observable_room_events.subscribe();
+
+        stream! {
+            for await (event, room) in stream {
+                yield LiveLocationShare {
+                    last_location: LastLocation {
+                        location: event.content.location,
+                        ts: event.content.ts,
+                    },
+                    beacon_info: room
+                        .get_user_beacon_info(&event.sender)
+                        .await
+                        .ok()
+                        .map(|info| info.content),
+                    user_id: event.sender,
+                };
+            }
+        }
+    }
+}
 
 /// Details of the last known location beacon.
 #[derive(Clone, Debug)]
@@ -34,7 +76,7 @@ pub struct LiveLocationShare {
     /// The user's last known location.
     pub last_location: LastLocation,
     /// Information about the associated beacon event.
-    pub beacon_info: BeaconInfoEventContent,
+    pub beacon_info: Option<BeaconInfoEventContent>,
     /// The user ID of the person sharing their live location.
     pub user_id: OwnedUserId,
 }
