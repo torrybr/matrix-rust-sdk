@@ -22,6 +22,7 @@ use ruma::{
     },
     MilliSecondsSinceUnixEpoch, OwnedUserId, RoomId,
 };
+use tracing::warn;
 
 use crate::{event_handler::ObservableEventHandler, Client, Room};
 
@@ -42,16 +43,25 @@ impl ObservableLiveLocation {
         let stream = self.observable_room_events.subscribe();
         stream! {
             for await (event, room) in stream {
+                    let beacon_info = room
+                            .get_user_beacon_info(&event.sender)
+                            .await
+                            .ok()
+                            .map(|info| info.content);
+
+                    warn!("TORRY: Beacon event: {:?}", event);
+
+                    // if beacon, print the beacon info
+                    if let Some(beacon_info) = &beacon_info {
+                        warn!("TORRY: Beacon info: {:?}", beacon_info);
+                    }
+
                     yield LiveLocationShare {
                         last_location: LastLocation {
                             location: event.content.location,
                             ts: event.origin_server_ts,
                         },
-                        beacon_info: room
-                            .get_user_beacon_info(&event.sender)
-                            .await
-                            .ok()
-                            .map(|info| info.content),
+                        beacon_info,
                         user_id: event.sender,
                     };
             }

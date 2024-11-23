@@ -28,7 +28,7 @@ use ruma::{
     EventId, Int, OwnedDeviceId, OwnedUserId, RoomAliasId, UserId,
 };
 use tokio::sync::RwLock;
-use tracing::error;
+use tracing::{error, warn};
 
 use super::RUNTIME;
 use crate::{
@@ -36,9 +36,10 @@ use crate::{
     error::{ClientError, MediaInfoError, RoomError},
     event::{MessageLikeEventType, StateEventType},
     identity_status_change::IdentityStatusChange,
+    live_location_share::{LastLocation, LiveLocationShare},
     room_info::RoomInfo,
     room_member::RoomMember,
-    ruma::{ImageInfo, Mentions, NotifyType},
+    ruma::{ImageInfo, LocationContent, Mentions, NotifyType},
     timeline::{FocusEventError, ReceiptType, SendHandle, Timeline},
     utils::u64_to_uint,
     TaskHandle,
@@ -615,6 +616,43 @@ impl Room {
         })))
     }
 
+    pub fn subscribe_to_live_location_shares(
+        &self,
+        listener: Box<dyn LiveLocationShareListener>,
+    ) -> Arc<TaskHandle> {
+        let room = self.inner.clone();
+        Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
+            let observable_live_location_shares = room.observe_live_location_shares();
+            let mut stream = observable_live_location_shares.subscribe();
+
+            let mut stream_pin = pin!(stream);
+
+            warn!("TORRY: Subscribing to live location shares");
+
+            while let Some(event) = stream_pin.next().await {
+                let matrix_sdk::live_location_share::LiveLocationShare {
+                    user_id,
+                    last_location,
+                    beacon_info,
+                } = event;
+
+                let lc = LocationContent {
+                    body: "".to_string(),
+                    geo_uri: last_location.location.uri.clone().to_string(),
+                    description: None,
+                    zoom_level: None,
+                    asset: None,
+                };
+
+                listener.call(vec![LiveLocationShare {
+                    last_location: LastLocation { location: lc },
+                    is_live: false,
+                    user_id: user_id.to_string(),
+                }]);
+            }
+        })))
+    }
+
     /// Set (or unset) a flag on the room to indicate that the user has
     /// explicitly marked it as unread.
     pub async fn set_unread_flag(&self, new_value: bool) -> Result<(), ClientError> {
@@ -912,6 +950,11 @@ pub trait TypingNotificationsListener: Sync + Send {
 #[matrix_sdk_ffi_macros::export(callback_interface)]
 pub trait IdentityStatusChangeListener: Sync + Send {
     fn call(&self, identity_status_change: Vec<IdentityStatusChange>);
+}
+
+#[matrix_sdk_ffi_macros::export(callback_interface)]
+pub trait LiveLocationShareListener: Sync + Send {
+    fn call(&self, live_location_share: Vec<LiveLocationShare>);
 }
 
 #[derive(uniffi::Object)]

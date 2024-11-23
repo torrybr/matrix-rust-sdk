@@ -12,6 +12,7 @@ mod error;
 mod event;
 mod helpers;
 mod identity_status_change;
+mod live_location_share;
 mod notification;
 mod notification_settings;
 mod platform;
