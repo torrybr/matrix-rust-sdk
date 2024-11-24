@@ -25,7 +25,7 @@ use ruma::{
         },
         TimelineEventType,
     },
-    EventId, Int, OwnedDeviceId, OwnedUserId, RoomAliasId, UserId,
+    EventId, Int, MilliSecondsSinceUnixEpoch, OwnedDeviceId, OwnedUserId, RoomAliasId, UserId,
 };
 use tokio::sync::RwLock;
 use tracing::{error, warn};
@@ -622,32 +622,25 @@ impl Room {
     ) -> Arc<TaskHandle> {
         let room = self.inner.clone();
         Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
-            let observable_live_location_shares = room.observe_live_location_shares();
-            let mut stream = observable_live_location_shares.subscribe();
-
-            let mut stream_pin = pin!(stream);
+            let observable = room.observe_live_location_shares();
+            let mut stream = pin!(observable.subscribe());
 
             warn!("TORRY: Subscribing to live location shares");
 
-            while let Some(event) = stream_pin.next().await {
-                let matrix_sdk::live_location_share::LiveLocationShare {
-                    user_id,
-                    last_location,
-                    beacon_info,
-                } = event;
-
-                let lc = LocationContent {
-                    body: "".to_string(),
-                    geo_uri: last_location.location.uri.clone().to_string(),
-                    description: None,
-                    zoom_level: None,
-                    asset: None,
-                };
-
+            while let Some(live_share) = stream.next().await {
                 listener.call(vec![LiveLocationShare {
-                    last_location: LastLocation { location: lc },
+                    last_location: LastLocation {
+                        location: LocationContent {
+                            body: "".to_string(),
+                            geo_uri: live_share.last_location.location.uri.to_string(),
+                            description: None,
+                            zoom_level: None,
+                            asset: None,
+                        },
+                        ts: live_share.last_location.ts,
+                    },
                     is_live: false,
-                    user_id: user_id.to_string(),
+                    user_id: live_share.user_id.to_string(),
                 }]);
             }
         })))

@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ruma::MilliSecondsSinceUnixEpoch;
+
 use crate::ruma::LocationContent;
 
 #[derive(uniffi::Record)]
 pub struct LastLocation {
     /// The most recent location content of the user.
     pub location: LocationContent,
-    // pub ts: MilliSecondsSinceUnixEpoch,
+    pub ts: MilliSecondsSinceUnixEpoch,
 }
 
 /// Details of a users live location share.
