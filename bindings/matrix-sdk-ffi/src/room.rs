@@ -44,6 +44,7 @@ use crate::{
     utils::u64_to_uint,
     TaskHandle,
 };
+use crate::ruma::LocationContent;
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Membership {
@@ -681,7 +682,7 @@ impl Room {
                 warn!("TORRY: FFI recieved event: {:?}", location);
 
                 listener.call(vec![LiveLocationShare {
-                    last_location: LastLocation { location: last_location },
+                    last_location: LastLocation { location: last_location, ts: location.last_location.ts.0.into() },
                     is_live: location.beacon_info.is_live(),
                     user_id: location.user_id.to_string(),
                 }]);
