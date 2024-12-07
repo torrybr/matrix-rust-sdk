@@ -689,6 +689,16 @@ impl Room {
         })))
     }
 
+    pub async fn start_live_location_share(&self, duration_millis: u64) -> Result<(), ClientError> {
+        self.inner.start_live_location_share(duration_millis, None).await?;
+        Ok(())
+    }
+
+    pub async fn stop_live_location_share(&self) -> Result<(), ClientError> {
+        self.inner.stop_live_location_share().await.expect("TODO: panic message");
+        Ok(())
+    }
+
     /// Set (or unset) a flag on the room to indicate that the user has
     /// explicitly marked it as unread.
     pub async fn set_unread_flag(&self, new_value: bool) -> Result<(), ClientError> {
