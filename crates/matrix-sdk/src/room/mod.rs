@@ -48,7 +48,6 @@ use matrix_sdk_base::{
 };
 use matrix_sdk_common::{
     deserialized_responses::SyncTimelineEvent,
-    executor::{spawn, JoinHandle},
     timeout::timeout,
 };
 use mime::Mime;
