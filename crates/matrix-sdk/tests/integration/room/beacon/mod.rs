@@ -214,7 +214,7 @@ async fn test_subscribe_to_live_location_shares() {
 
     let room = client.get_room(*DEFAULT_TEST_ROOM_ID).unwrap();
 
-    let mut subcription = room.subscribe_to_live_location_shares();
+    let mut subscription = room.subscribe_to_live_location_shares();
 
     let mut timeline_events = Vec::new();
 
@@ -250,7 +250,7 @@ async fn test_subscribe_to_live_location_shares() {
 
     for i in 0..timeline_events.len() {
         let live_location_share =
-            subcription.receiver.recv().await.expect("Failed to receive live location share");
+            subscription.receiver.recv().await.expect("Failed to receive live location share");
 
         assert_eq!(live_location_share.user_id.to_string(), "@example:localhost");
 
