@@ -3027,6 +3027,8 @@ impl Room {
         &self,
         user_id: &UserId,
     ) -> Result<OriginalSyncStateEvent<BeaconInfoEventContent>, BeaconError> {
+        warn!(room_id = %self.room_id(), "TORRY: Getting beacon info for user {}", user_id);
+
         let raw_event = self
             .get_state_event_static_for_key::<BeaconInfoEventContent, _>(user_id)
             .await?
@@ -3226,7 +3228,7 @@ impl Room {
                     beacon_info,
                 };
 
-                warn!("Returning live location share {:?}", live_location_share);
+                warn!("TORRY: Returning live location share {:?}", live_location_share);
 
                 let _ = sender.send(live_location_share);
             }

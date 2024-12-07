@@ -80,6 +80,7 @@ use crate::timeline;
 /// The default `required_state` constant value for sliding sync lists and
 /// sliding sync room subscriptions.
 const DEFAULT_REQUIRED_STATE: &[(StateEventType, &str)] = &[
+    (StateEventType::BeaconInfo, "*"),
     (StateEventType::RoomName, ""),
     (StateEventType::RoomEncryption, ""),
     (StateEventType::RoomMember, "$LAZY"),
