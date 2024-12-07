@@ -1404,6 +1404,7 @@ impl RoomInfo {
     ///
     /// Returns true if the event modified the info, false otherwise.
     pub fn handle_state_event(&mut self, event: &AnySyncStateEvent) -> bool {
+        warn!("TORRY: normal.rs -- handling state event");
         let ret = self.base_info.handle_state_event(event);
 
         // If we received an `m.room.encryption` event here, and encryption got enabled,

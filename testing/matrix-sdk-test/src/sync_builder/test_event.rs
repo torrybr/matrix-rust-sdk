@@ -13,6 +13,7 @@ use crate::test_json;
 pub enum StateTestEvent {
     Alias,
     Aliases,
+    BeaconInfo,
     Create,
     Encryption,
     HistoryVisibility,
@@ -39,6 +40,7 @@ impl StateTestEvent {
         match self {
             Self::Alias => test_json::sync_events::ALIAS.to_owned(),
             Self::Aliases => test_json::sync_events::ALIASES.to_owned(),
+            Self::BeaconInfo => test_json::sync_events::BEACON_INFO.to_owned(),
             Self::Create => test_json::sync_events::CREATE.to_owned(),
             Self::Encryption => test_json::sync_events::ENCRYPTION.to_owned(),
             Self::HistoryVisibility => test_json::sync_events::HISTORY_VISIBILITY.to_owned(),

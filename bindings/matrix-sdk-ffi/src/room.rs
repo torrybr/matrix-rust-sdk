@@ -698,7 +698,7 @@ impl Room {
                     asset: None,
                 };
 
-                warn!("TORRY: FFI recieved event: {:?}", location);
+                warn!("TORRY: FFI received event: {:?}", location);
 
                 listener.call(vec![LiveLocationShare {
                     last_location: LastLocation { location: last_location, ts: location.last_location.ts.0.into() },
