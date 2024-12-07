@@ -700,6 +700,11 @@ impl Room {
         Ok(())
     }
 
+    pub async fn send_live_location(&self, geo_uri: String) -> Result<(), ClientError> {
+        self.inner.send_location_beacon(geo_uri).await.expect("TORRY: Could not send location beacon");
+        Ok(())
+    }
+
     /// Set (or unset) a flag on the room to indicate that the user has
     /// explicitly marked it as unread.
     pub async fn set_unread_flag(&self, new_value: bool) -> Result<(), ClientError> {

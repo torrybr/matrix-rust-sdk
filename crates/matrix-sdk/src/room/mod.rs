@@ -3086,7 +3086,7 @@ impl Room {
         Ok(self.send_state_event_for_key(self.own_user_id(), beacon_info_event.content).await?)
     }
 
-    /// Send a location beacon event in the current room.
+    /// Send the current users location as a live location sharing beacon.
     ///
     /// # Arguments
     ///
