@@ -687,8 +687,6 @@ impl Room {
         Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
             let mut subscription = room.subscribe_to_live_location_shares();
 
-            info!("TORRY: Subscribed to live location shares");
-
             while let Ok(location) = subscription.receiver.recv().await {
                 let last_location = LocationContent {
                     body: "".to_string(),
