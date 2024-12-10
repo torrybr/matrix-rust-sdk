@@ -3210,7 +3210,7 @@ impl Room {
         let beacon_event_handler_handle = self.client.add_room_event_handler(&room_id, {
             move |event: OriginalSyncBeaconEvent| async move {
                 let user_id = event.sender;
-
+                
                 let beacon_info = match room.get_user_beacon_info(&user_id).await {
                     Ok(info) => info.content,
                     Err(e) => {
