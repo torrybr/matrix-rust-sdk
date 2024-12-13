@@ -3030,8 +3030,6 @@ impl Room {
         &self,
         user_id: &UserId,
     ) -> Result<OriginalSyncStateEvent<BeaconInfoEventContent>, BeaconError> {
-        warn!(room_id = %self.room_id(), "TORRY: Getting beacon info for user {}", user_id);
-
         let raw_event = self
             .get_state_event_static_for_key::<BeaconInfoEventContent, _>(user_id)
             .await?

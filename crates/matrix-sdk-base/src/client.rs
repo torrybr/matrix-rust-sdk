@@ -455,7 +455,6 @@ impl BaseClient {
                                     );
                                 }
                                 _ => {
-                                    warn!("TORRY: client.rs::handle_timeline");
                                     room_info.handle_state_event(s);
                                 }
                             }
@@ -623,7 +622,6 @@ impl BaseClient {
         assert_eq!(raw_events.len(), events.len());
 
         for (raw_event, event) in iter::zip(raw_events, events) {
-            warn!("TORRY: client.rs::handle_state");
             room_info.handle_state_event(event);
 
             if let AnySyncStateEvent::RoomMember(member) = &event {
