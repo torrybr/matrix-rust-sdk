@@ -46,17 +46,14 @@ use matrix_sdk_base::{
     ComposerDraft, RoomInfoNotableUpdateReasons, RoomMemberships, StateChanges, StateStoreDataKey,
     StateStoreDataValue,
 };
-use matrix_sdk_common::{
-    deserialized_responses::SyncTimelineEvent,
-    timeout::timeout,
-};
+use matrix_sdk_common::{deserialized_responses::SyncTimelineEvent, timeout::timeout};
 use mime::Mime;
 use ruma::{
     api::client::{
         config::{set_global_account_data, set_room_account_data},
         context,
         error::ErrorKind,
-        filter::LazyLoadOptions,
+        filter::{LazyLoadOptions, RoomEventFilter},
         membership::{
             ban_user, forget_room, get_member_events,
             invite_user::{self, v3::InvitationRecipient},
@@ -3210,7 +3207,12 @@ impl Room {
         let beacon_event_handler_handle = self.client.add_room_event_handler(&room_id, {
             move |event: OriginalSyncBeaconEvent| async move {
                 let user_id = event.sender;
-                
+
+                // Do not return your own beacon events
+                if user_id == room.own_user_id() {
+                    return;
+                }
+
                 let beacon_info = match room.get_user_beacon_info(&user_id).await {
                     Ok(info) => info.content,
                     Err(e) => {
@@ -3228,13 +3230,24 @@ impl Room {
                     beacon_info,
                 };
 
-                warn!("TORRY: Returning live location share {:?}", live_location_share);
-
                 let _ = sender.send(live_location_share);
             }
         });
 
         LiveLocationSubscription { event_handler_handle: beacon_event_handler_handle, receiver }
+    }
+
+    /// Load the last 200 images sent in the room.
+    pub async fn load_image_events(&self) -> Result<Vec<Raw<AnyTimelineEvent>>> {
+        let options = assign!(MessagesOptions::backward(), {
+            limit: UInt::try_from(200)?,
+            filter: assign!(RoomEventFilter::default(), {
+                types: Some(vec!["m.image".to_owned()]),
+            }),
+        });
+
+        let messages = self.messages(options).await?;
+        Ok(messages.chunk.into_iter().map(|ev| ev.into_raw().cast()).collect())
     }
 }
 
