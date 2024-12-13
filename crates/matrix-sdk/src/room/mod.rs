@@ -3024,8 +3024,6 @@ impl Room {
         &self,
         user_id: &UserId,
     ) -> Result<OriginalSyncStateEvent<BeaconInfoEventContent>, BeaconError> {
-        warn!(room_id = %self.room_id(), "TORRY: Getting beacon info for user {}", user_id);
-
         let raw_event = self
             .get_state_event_static_for_key::<BeaconInfoEventContent, _>(user_id)
             .await?
@@ -3216,7 +3214,7 @@ impl Room {
                 let beacon_info = match room.get_user_beacon_info(&user_id).await {
                     Ok(info) => info.content,
                     Err(e) => {
-                        warn!(user_id = ?user_id, "TORRY: Failed to get beacon info: {:?}", e);
+                        warn!(user_id = ?user_id, "Failed to get beacon info: {:?}", e);
                         return;
                     }
                 };

@@ -676,8 +676,6 @@ impl Room {
                     asset: None,
                 };
 
-                warn!("TORRY: FFI received event: {:?}", location);
-
                 listener.call(vec![LiveLocationShare {
                     last_location: LastLocation {
                         location: last_location,
@@ -704,7 +702,7 @@ impl Room {
         self.inner
             .send_location_beacon(geo_uri)
             .await
-            .expect("TORRY: Could not send location beacon");
+            .expect("Could not send location beacon");
         Ok(())
     }
 
