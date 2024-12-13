@@ -699,10 +699,7 @@ impl Room {
     }
 
     pub async fn send_live_location(&self, geo_uri: String) -> Result<(), ClientError> {
-        self.inner
-            .send_location_beacon(geo_uri)
-            .await
-            .expect("Could not send location beacon");
+        self.inner.send_location_beacon(geo_uri).await.expect("Could not send location beacon");
         Ok(())
     }
 

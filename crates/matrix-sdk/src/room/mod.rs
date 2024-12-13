@@ -2577,6 +2577,14 @@ impl Room {
             .user_can_send_state(user_id, StateEventType::RoomPinnedEvents))
     }
 
+    /// Returns true if the user with the given user_id is able to send start a
+    /// live location share in this room.
+    ///
+    /// The call may fail if there is an error in getting the power levels.
+    pub async fn can_user_share_live_location(&self, user_id: &UserId) -> Result<bool> {
+        Ok(self.power_levels().await?.user_can_send_state(user_id, StateEventType::BeaconInfo))
+    }
+
     /// Returns true if the user with the given user_id is able to trigger a
     /// notification in the room.
     ///
