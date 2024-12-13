@@ -602,6 +602,11 @@ impl Room {
         Ok(self.inner.can_user_pin_unpin(&user_id).await?)
     }
 
+    pub async fn can_user_share_live_location(&self, user_id: String) -> Result<bool, ClientError> {
+        let user_id = UserId::parse(&user_id)?;
+        Ok(self.inner.can_user_share_live_location(&user_id).await?)
+    }
+
     pub async fn can_user_trigger_room_notification(
         &self,
         user_id: String,
@@ -688,18 +693,21 @@ impl Room {
         })))
     }
 
+    /// Start the current users live location share in the room.
     pub async fn start_live_location_share(&self, duration_millis: u64) -> Result<(), ClientError> {
         self.inner.start_live_location_share(duration_millis, None).await?;
         Ok(())
     }
 
+    /// Stop the current users live location share in the room.
     pub async fn stop_live_location_share(&self) -> Result<(), ClientError> {
-        self.inner.stop_live_location_share().await.expect("TODO: panic message");
+        self.inner.stop_live_location_share().await.expect("Unable to stop live location share");
         Ok(())
     }
 
+    /// Send the current users live location beacon in the room.
     pub async fn send_live_location(&self, geo_uri: String) -> Result<(), ClientError> {
-        self.inner.send_location_beacon(geo_uri).await.expect("Could not send location beacon");
+        self.inner.send_location_beacon(geo_uri).await.expect("Unable to send location beacon");
         Ok(())
     }
 
