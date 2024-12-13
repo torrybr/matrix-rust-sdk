@@ -44,7 +44,6 @@ use crate::{
     utils::u64_to_uint,
     TaskHandle,
 };
-use crate::ruma::LocationContent;
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Membership {
@@ -699,7 +698,10 @@ impl Room {
                 warn!("TORRY: FFI received event: {:?}", location);
 
                 listener.call(vec![LiveLocationShare {
-                    last_location: LastLocation { location: last_location, ts: location.last_location.ts.0.into() },
+                    last_location: LastLocation {
+                        location: last_location,
+                        ts: location.last_location.ts.0.into(),
+                    },
                     is_live: location.beacon_info.is_live(),
                     user_id: location.user_id.to_string(),
                 }]);
@@ -718,7 +720,10 @@ impl Room {
     }
 
     pub async fn send_live_location(&self, geo_uri: String) -> Result<(), ClientError> {
-        self.inner.send_location_beacon(geo_uri).await.expect("TORRY: Could not send location beacon");
+        self.inner
+            .send_location_beacon(geo_uri)
+            .await
+            .expect("TORRY: Could not send location beacon");
         Ok(())
     }
 

@@ -46,10 +46,7 @@ use matrix_sdk_base::{
     ComposerDraft, RoomInfoNotableUpdateReasons, RoomMemberships, StateChanges, StateStoreDataKey,
     StateStoreDataValue,
 };
-use matrix_sdk_common::{
-    deserialized_responses::SyncTimelineEvent,
-    timeout::timeout,
-};
+use matrix_sdk_common::{deserialized_responses::SyncTimelineEvent, timeout::timeout};
 use mime::Mime;
 #[cfg(feature = "e2e-encryption")]
 use ruma::events::{
@@ -61,7 +58,7 @@ use ruma::{
         config::{set_global_account_data, set_room_account_data},
         context,
         error::ErrorKind,
-        filter::LazyLoadOptions,
+        filter::{LazyLoadOptions, RoomEventFilter},
         membership::{
             ban_user, forget_room, get_member_events,
             invite_user::{self, v3::InvitationRecipient},
@@ -3209,6 +3206,19 @@ impl Room {
     /// response that contains an `m.beacon` event.
     pub fn observe_live_location_shares(&self) -> ObservableLiveLocation {
         ObservableLiveLocation::new(&self.client, self.room_id())
+    }
+
+    /// Load the last 200 images sent in the room.
+    pub async fn load_image_events(&self) -> Result<Vec<Raw<AnyTimelineEvent>>> {
+        let options = assign!(MessagesOptions::backward(), {
+            limit: UInt::try_from(200)?,
+            filter: assign!(RoomEventFilter::default(), {
+                types: Some(vec!["m.image".to_owned()]),
+            }),
+        });
+
+        let messages = self.messages(options).await?;
+        Ok(messages.chunk.into_iter().map(|ev| ev.into_raw().cast()).collect())
     }
 }
 

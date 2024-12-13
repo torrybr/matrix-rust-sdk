@@ -47,6 +47,7 @@ use ruma::{
 };
 use serde::{Deserialize, Serialize};
 use tracing::warn;
+
 use crate::MinimalStateEvent;
 
 /// The name of the room, either from the metadata or calculated
