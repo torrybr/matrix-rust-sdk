@@ -264,6 +264,16 @@ impl Store {
             .collect()
     }
 
+    pub fn rooms_filtered_by_active_location_sharing(&self) -> Vec<Room> {
+        self.rooms
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|room| room.state().active_live_location_sharing_participants().len() > 0)
+            .cloned()
+            .collect()
+    }
+
     /// Get a stream of all the rooms changes, in addition to the existing
     /// rooms.
     pub fn rooms_stream(&self) -> (Vector<Room>, impl Stream<Item = Vec<VectorDiff<Room>>>) {

@@ -60,6 +60,10 @@ pub struct RoomInfo {
     pinned_event_ids: Vec<String>,
     /// The join rule for this room, if known.
     join_rule: Option<JoinRule>,
+    /// The users who are currently sharing their live location in this room.
+    active_live_location_sharing_participants: Vec<String>,
+    /// Whether there are any active live location shares in this room.
+    has_active_live_location_shares: bool,
 }
 
 impl RoomInfo {
@@ -128,6 +132,12 @@ impl RoomInfo {
             num_unread_mentions: room.num_unread_mentions(),
             pinned_event_ids,
             join_rule: join_rule.ok(),
+            active_live_location_sharing_participants: room
+                .active_location_share_participants()
+                .iter()
+                .map(|u| u.to_string())
+                .collect(),
+            has_active_live_location_shares: room.has_active_location_shares(),
         })
     }
 }

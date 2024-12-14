@@ -41,36 +41,29 @@ use matrix_sdk_base::{
 };
 #[cfg(feature = "e2e-encryption")]
 use ruma::events::{room::encryption::RoomEncryptionEventContent, InitialStateEvent};
-use ruma::{
-    api::{
-        client::{
-            account::whoami,
-            alias::{create_alias, get_alias},
-            device::{delete_devices, get_devices, update_device},
-            directory::{get_public_rooms, get_public_rooms_filtered},
-            discovery::{
-                get_capabilities::{self, Capabilities},
-                get_supported_versions,
-            },
-            error::ErrorKind,
-            filter::{create_filter::v3::Request as FilterUploadRequest, FilterDefinition},
-            knock::knock_room,
-            membership::{join_room_by_id, join_room_by_id_or_alias},
-            room::create_room,
-            session::login::v3::DiscoveryInfo,
-            sync::sync_events,
-            uiaa,
-            user_directory::search_users,
+use ruma::{api::{
+    client::{
+        account::whoami,
+        alias::{create_alias, get_alias},
+        device::{delete_devices, get_devices, update_device},
+        directory::{get_public_rooms, get_public_rooms_filtered},
+        discovery::{
+            get_capabilities::{self, Capabilities},
+            get_supported_versions,
         },
-        error::FromHttpResponseError,
-        MatrixVersion, OutgoingRequest,
+        error::ErrorKind,
+        filter::{create_filter::v3::Request as FilterUploadRequest, FilterDefinition},
+        knock::knock_room,
+        membership::{join_room_by_id, join_room_by_id_or_alias},
+        room::create_room,
+        session::login::v3::DiscoveryInfo,
+        sync::sync_events,
+        uiaa,
+        user_directory::search_users,
     },
-    assign,
-    push::Ruleset,
-    time::Instant,
-    DeviceId, OwnedDeviceId, OwnedEventId, OwnedRoomId, OwnedRoomOrAliasId, OwnedServerName,
-    RoomAliasId, RoomId, RoomOrAliasId, ServerName, UInt, UserId,
-};
+    error::FromHttpResponseError,
+    MatrixVersion, OutgoingRequest,
+}, assign, push::Ruleset, time::Instant, DeviceId, OwnedDeviceId, OwnedEventId, OwnedRoomId, OwnedRoomOrAliasId, OwnedServerName, OwnedUserId, RoomAliasId, RoomId, RoomOrAliasId, ServerName, UInt, UserId};
 use serde::de::DeserializeOwned;
 use tokio::sync::{broadcast, Mutex, OnceCell, RwLock, RwLockReadGuard};
 use tracing::{debug, error, instrument, trace, warn, Instrument, Span};
@@ -564,6 +557,23 @@ impl Client {
         }
 
         self.send(request, None).await
+    }
+
+    /**
+    * Send a live location to all rooms a user may be in.
+    * TODO: an improvement here is to not iterate over all rooms, but only the ones that have active location sharing.
+    */
+    pub async fn send_live_location_to_rooms(
+        &self,
+        geo_uri: &str,
+    ) {
+        // self.inner.base_client.rooms().iter().for_each(|room| {
+        //     let user = self.user_id().unwrap().to_string();
+        //     let owned_user_id = OwnedUserId::try_from(user).unwrap();
+        //     if room.active_location_share_participants().contains(&owned_user_id) {
+        //         room.c
+        //     }
+        // });
     }
 
     /// Get the user id of the current owner of the client.

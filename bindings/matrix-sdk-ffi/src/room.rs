@@ -28,7 +28,7 @@ use ruma::{
     EventId, Int, OwnedDeviceId, OwnedUserId, RoomAliasId, UserId,
 };
 use tokio::sync::RwLock;
-use tracing::{error, info, log::warn};
+use tracing::error;
 
 use super::RUNTIME;
 use crate::{
@@ -139,6 +139,16 @@ impl Room {
     /// Returns the room heroes for this room.
     pub fn heroes(&self) -> Vec<RoomHero> {
         self.inner.heroes().into_iter().map(Into::into).collect()
+    }
+
+    /// Does this room have an active location share.
+    pub fn has_active_location_share(&self) -> bool {
+        self.inner.has_active_location_shares()
+    }
+
+    /// Is the given user sharing their location in this room.
+    pub fn active_location_share_participants(&self) -> Vec<String> {
+        self.inner.active_location_share_participants().iter().map(|u| u.to_string()).collect()
     }
 
     /// Is there a non expired membership with application "m.call" and scope

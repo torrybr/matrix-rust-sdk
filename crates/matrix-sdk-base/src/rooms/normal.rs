@@ -584,6 +584,14 @@ impl Room {
         self.inner.read().active_room_call_participants()
     }
 
+    pub fn has_active_location_shares(&self) -> bool {
+        self.inner.read().has_active_location_shares()
+    }
+
+    pub fn active_location_share_participants(&self) -> Vec<OwnedUserId> {
+        self.inner.read().active_location_share_participants()
+    }
+
     /// Return the cached display name of the room if it was provided via sync,
     /// or otherwise calculate it, taking into account its name, aliases and
     /// members.
@@ -1689,6 +1697,26 @@ impl RoomInfo {
             .iter()
             .map(|(call_member_state_key, _)| call_member_state_key.user_id().to_owned())
             .collect()
+    }
+
+    /// Is there an active live location share happening in this room.
+    pub fn has_active_location_shares(&self) -> bool {
+        !self.active_location_share_participants().is_empty()
+    }
+
+    /// An array of all the userId's that are currently sharing their location
+    /// TODO (tb): this needs to only return the userIds where beacon_info is_live().
+    pub fn active_location_share_participants(&self) -> Vec<OwnedUserId> {
+        self.base_info
+            .beacons
+            .iter()
+            .map(|(beacon_info_state_key, beacon_info)| beacon_info_state_key.to_owned())
+            .collect()
+    }
+
+    // Check if the key exists and call a function on the value.
+    pub fn is_user_sharing_live_location(&self, user_id: &UserId) -> bool {
+
     }
 
     /// Returns the latest (decrypted) event recorded for this room.
