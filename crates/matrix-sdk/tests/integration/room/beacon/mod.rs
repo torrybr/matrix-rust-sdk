@@ -192,8 +192,8 @@ async fn test_most_recent_event_in_stream() {
                                     },
                                     "event_id": "$15139375514XsgmR:localhost",
                                     "origin_server_ts": millis_time,
-                                    "sender": "@example2:localhost",
-                                    "state_key": "@example2:localhost",
+                                    "sender": "@example:localhost",
+                                    "state_key": "@example:localhost",
                                     "type": "org.matrix.msc3672.beacon_info",
                                     "unsigned": {
                                         "age": 7034220
@@ -235,7 +235,7 @@ async fn test_most_recent_event_in_stream() {
             },
             "event_id": format!("$event_for_stream_{nth}"),
             "origin_server_ts": 1_636_829_458,
-            "sender": "@example2:localhost",
+            "sender": "@example:localhost",
             "type": "org.matrix.msc3672.beacon",
             "unsigned": {
                 "age": 598971
@@ -256,7 +256,7 @@ async fn test_most_recent_event_in_stream() {
     let LiveLocationShare { user_id, last_location, beacon_info } =
         stream.next().await.expect("Another live location was expected");
 
-    assert_eq!(live_location_share.user_id.to_string(), "@example2:localhost");
+    assert_eq!(user_id.to_string(), "@example:localhost");
 
     assert_eq!(last_location.location.uri, "geo:24.9575274619722,12.494122581370175;u=24");
 
@@ -447,8 +447,10 @@ async fn test_subscribing_to_live_location_does_not_return_own_beacon_updates() 
     server.reset().await;
 
     let room = client.get_room(*DEFAULT_TEST_ROOM_ID).unwrap();
+    let observable_live_location_shares = room.observe_live_location_shares();
+    let stream = observable_live_location_shares.subscribe();
+    pin_mut!(stream);
 
-    let mut subscription = room.subscribe_to_live_location_shares();
 
     let mut timeline_events = Vec::new();
 
@@ -499,27 +501,29 @@ async fn test_subscribing_to_live_location_does_not_return_own_beacon_updates() 
     let _response = client.sync_once(sync_settings.clone()).await.unwrap();
     server.reset().await;
 
-    let live_location_share =
-        subscription.receiver.recv().await.expect("Failed to receive live location share");
+    let LiveLocationShare { user_id, last_location, beacon_info } =
+        stream.next().await.expect("Another live location was expected");
 
-    assert_eq!(live_location_share.user_id.to_string(), "@example2:localhost");
+    assert_eq!(user_id.to_string(), "@example2:localhost");
 
     assert_eq!(
-        live_location_share.last_location.location.uri,
+        last_location.location.uri,
         "geo:1.9575274619722,12.494122581370175;u=1".to_string()
     );
 
-    assert!(live_location_share.last_location.location.description.is_none());
-    assert!(live_location_share.last_location.location.zoom_level.is_none());
+    assert!(last_location.location.description.is_none());
+    assert!(last_location.location.zoom_level.is_none());
     assert_eq!(
-        live_location_share.last_location.ts,
+        last_location.ts,
         MilliSecondsSinceUnixEpoch(uint!(1_636_829_458))
     );
 
-    assert!(live_location_share.beacon_info.live);
-    assert!(live_location_share.beacon_info.is_live());
-    assert_eq!(live_location_share.beacon_info.description, Some("Live Share".to_owned()));
-    assert_eq!(live_location_share.beacon_info.timeout, Duration::from_millis(3000));
-    assert_eq!(live_location_share.beacon_info.ts, current_time);
-    assert_eq!(live_location_share.beacon_info.asset.type_, AssetType::Self_);
+    let beacon_info = beacon_info.expect("Live location share is missing the beacon_info");
+
+    assert!(beacon_info.live);
+    assert!(beacon_info.is_live());
+    assert_eq!(beacon_info.description, Some("Live Share".to_owned()));
+    assert_eq!(beacon_info.timeout, Duration::from_millis(3000));
+    assert_eq!(beacon_info.ts, current_time);
+    assert_eq!(beacon_info.asset.type_, AssetType::Self_);
 }

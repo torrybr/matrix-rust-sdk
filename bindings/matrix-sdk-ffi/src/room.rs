@@ -44,6 +44,7 @@ use crate::{
     utils::u64_to_uint,
     TaskHandle,
 };
+use crate::ruma::LocationContent;
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Membership {
@@ -689,25 +690,29 @@ impl Room {
         let room = self.inner.clone();
 
         Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
-            let mut subscription = room.subscribe_to_live_location_shares();
+            let subscription = room.observe_live_location_shares();
+            let mut stream = subscription.subscribe();
+            let mut pinned_stream = pin!(stream);
 
-            while let Ok(location) = subscription.receiver.recv().await {
-                let last_location = LocationContent {
+            while let Some(event) = pinned_stream.next().await {
+                  let last_location = LocationContent {
                     body: "".to_string(),
-                    geo_uri: location.last_location.location.uri.clone().to_string(),
+                    geo_uri: event.last_location.location.uri.clone().to_string(),
                     description: None,
                     zoom_level: None,
                     asset: None,
-                };
+                  };
+
+                let beacon_info = event.beacon_info.expect("Live location share is missing the beacon_info");
 
                 listener.call(vec![LiveLocationShare {
                     last_location: LastLocation {
                         location: last_location,
-                        ts: location.last_location.ts.0.into(),
+                        ts: event.last_location.ts.0.into()
                     },
-                    is_live: location.beacon_info.is_live(),
-                    user_id: location.user_id.to_string(),
-                }]);
+                    is_live: beacon_info.is_live(),
+                    user_id: event.user_id.to_string(),
+                }])
             }
         })))
     }

@@ -75,7 +75,7 @@ use ruma::{
     },
     assign,
     events::{
-        beacon::{BeaconEventContent, OriginalSyncBeaconEvent},
+        beacon::{BeaconEventContent},
         beacon_info::BeaconInfoEventContent,
         call::notify::{ApplicationType, CallNotifyEventContent, NotifyType},
         direct::DirectEventContent,
@@ -3034,7 +3034,7 @@ impl Room {
     ///
     /// Returns an error if the event is redacted, stripped, not found or could
     /// not be deserialized.
-    pub(crate) async fn get_user_beacon_info(
+    pub async fn get_user_beacon_info(
         &self,
         user_id: &UserId,
     ) -> Result<OriginalSyncStateEvent<BeaconInfoEventContent>, BeaconError> {
