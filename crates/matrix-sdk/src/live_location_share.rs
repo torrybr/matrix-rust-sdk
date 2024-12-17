@@ -27,11 +27,13 @@ use ruma::{
 };
 use tokio::sync::broadcast;
 
-use crate::{event_handler::ObservableEventHandler, Client, Room};
-use crate::event_handler::EventHandlerHandle;
+use crate::{
+    event_handler::{EventHandlerHandle, ObservableEventHandler},
+    Client, Room,
+};
 
 /// An observable live location.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ObservableLiveLocation {
     observable_room_events: ObservableEventHandler<(OriginalSyncBeaconEvent, Room)>,
 }
@@ -47,19 +49,21 @@ impl ObservableLiveLocation {
         let stream = self.observable_room_events.subscribe();
         stream! {
             for await (event, room) in stream {
-                yield LiveLocationShare {
-                    last_location: LastLocation {
-                        location: event.content.location,
-                        ts: event.origin_server_ts,
-                    },
-                    beacon_info: room
-                        .get_user_beacon_info(&event.sender)
-                        .await
-                        .ok()
-                        .map(|info| info.content),
-                    user_id: event.sender,
-                };
-            }
+                    if event.sender.to_string() != "@example@localhost" {
+                          yield LiveLocationShare {
+                            last_location: LastLocation {
+                                location: event.content.location,
+                                ts: event.origin_server_ts,
+                            },
+                            beacon_info: room
+                                .get_user_beacon_info(&event.sender)
+                                .await
+                                .ok()
+                                .map(|info| info.content),
+                            user_id: event.sender,
+                        };
+                    }
+                }
         }
     }
 }

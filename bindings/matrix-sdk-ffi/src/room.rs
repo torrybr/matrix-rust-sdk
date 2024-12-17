@@ -39,12 +39,11 @@ use crate::{
     live_location_share::{LastLocation, LiveLocationShare},
     room_info::RoomInfo,
     room_member::RoomMember,
-    ruma::{ImageInfo, Mentions, NotifyType},
+    ruma::{ImageInfo, LocationContent, Mentions, NotifyType},
     timeline::{DateDividerMode, FocusEventError, ReceiptType, SendHandle, Timeline},
     utils::u64_to_uint,
     TaskHandle,
 };
-use crate::ruma::LocationContent;
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Membership {
@@ -687,34 +686,66 @@ impl Room {
         &self,
         listener: Box<dyn LiveLocationShareListener>,
     ) -> Arc<TaskHandle> {
+        // uncomment for use with observe live location shares
         let room = self.inner.clone();
 
         Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
-            let subscription = room.observe_live_location_shares();
-            let mut stream = subscription.subscribe();
-            let mut pinned_stream = pin!(stream);
+            let (_event_handler_drop_guard, mut subscriber) =
+                room.subscribe_to_live_location_shares();
 
-            while let Some(event) = pinned_stream.next().await {
-                  let last_location = LocationContent {
+            while let Ok(location) = subscriber.recv().await {
+                let last_location = LocationContent {
                     body: "".to_string(),
-                    geo_uri: event.last_location.location.uri.clone().to_string(),
+                    geo_uri: location.last_location.location.uri.clone().to_string(),
                     description: None,
                     zoom_level: None,
                     asset: None,
-                  };
+                };
 
-                let beacon_info = event.beacon_info.expect("Live location share is missing the beacon_info");
+                let beacon_info =
+                    location.beacon_info.expect("Live location share is missing the beacon_info");
 
                 listener.call(vec![LiveLocationShare {
                     last_location: LastLocation {
                         location: last_location,
-                        ts: event.last_location.ts.0.into()
+                        ts: location.last_location.ts.0.into(),
                     },
                     is_live: beacon_info.is_live(),
-                    user_id: event.user_id.to_string(),
-                }])
+                    user_id: location.user_id.to_string(),
+                }]);
             }
         })))
+
+        // Useful when calling observe live location shares
+        // Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
+        //     let subscription = room.observe_live_location_shares();
+        //     let mut stream = subscription.subscribe();
+        //     let mut pinned_stream = pin!(stream);
+        //
+        //     while let Some(event) = pinned_stream.next().await {
+        //         let last_location = LocationContent {
+        //             body: "".to_string(),
+        //             geo_uri:
+        // event.last_location.location.uri.clone().to_string(),
+        //             description: None,
+        //             zoom_level: None,
+        //             asset: None,
+        //         };
+        //
+        //         let beacon_info =
+        //             event.beacon_info.expect("Live location share is missing
+        // the beacon_info");
+        //
+        //         listener.call(vec![LiveLocationShare {
+        //             last_location: LastLocation {
+        //                 location: last_location,
+        //                 ts: event.last_location.ts.0.into(),
+        //             },
+        //             is_live: beacon_info.is_live(),
+        //             user_id: event.user_id.to_string(),
+        //         }])
+        //     }
+        // })))
     }
 
     /// Start the current users live location share in the room.
