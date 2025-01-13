@@ -39,6 +39,26 @@ pub static ALIASES: Lazy<JsonValue> = Lazy::new(|| {
     })
 });
 
+pub static BEACON_INFO: Lazy<JsonValue> = Lazy::new(|| {
+    json!({
+        "content": {
+            "description": "Live Share",
+            "live": true,
+            "org.matrix.msc3488.ts": 1_636_829_458,
+            "timeout": 3000,
+            "org.matrix.msc3488.asset": { "type": "m.self" }
+        },
+        "event_id": "$15139375514XsgmR:localhost",
+        "origin_server_ts": 151393755,
+        "sender": "@example:localhost",
+        "state_key": "@example:localhost",
+        "type": "org.matrix.msc3672.beacon_info",
+        "unsigned": {
+            "age": 7034220
+        }
+    })
+});
+
 pub static CREATE: Lazy<JsonValue> = Lazy::new(|| {
     json!({
         "content": {

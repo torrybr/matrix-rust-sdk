@@ -28,7 +28,7 @@ use ruma::{
     EventId, Int, OwnedDeviceId, OwnedUserId, RoomAliasId, UserId,
 };
 use tokio::sync::RwLock;
-use tracing::error;
+use tracing::{error, info, log::warn};
 
 use super::RUNTIME;
 use crate::{
@@ -36,9 +36,10 @@ use crate::{
     error::{ClientError, MediaInfoError, RoomError},
     event::{MessageLikeEventType, RoomMessageEventMessageType, StateEventType},
     identity_status_change::IdentityStatusChange,
+    live_location_share::{LastLocation, LiveLocationShare},
     room_info::RoomInfo,
     room_member::RoomMember,
-    ruma::{ImageInfo, Mentions, NotifyType},
+    ruma::{ImageInfo, LocationContent, Mentions, NotifyType},
     timeline::{DateDividerMode, FocusEventError, ReceiptType, SendHandle, Timeline},
     utils::u64_to_uint,
     TaskHandle,
@@ -620,6 +621,11 @@ impl Room {
         Ok(self.inner.can_user_pin_unpin(&user_id).await?)
     }
 
+    pub async fn can_user_share_live_location(&self, user_id: String) -> Result<bool, ClientError> {
+        let user_id = UserId::parse(&user_id)?;
+        Ok(self.inner.can_user_share_live_location(&user_id).await?)
+    }
+
     pub async fn can_user_trigger_room_notification(
         &self,
         user_id: String,
@@ -674,6 +680,90 @@ impl Room {
                 }
             }
         })))
+    }
+
+    pub fn subscribe_to_live_location_shares(
+        &self,
+        listener: Box<dyn LiveLocationShareListener>,
+    ) -> Arc<TaskHandle> {
+        // uncomment for use with observe live location shares
+        let room = self.inner.clone();
+
+        Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
+            let (_event_handler_drop_guard, mut subscriber) =
+                room.subscribe_to_live_location_shares();
+
+            while let Ok(location) = subscriber.recv().await {
+                let last_location = LocationContent {
+                    body: "".to_string(),
+                    geo_uri: location.last_location.location.uri.clone().to_string(),
+                    description: None,
+                    zoom_level: None,
+                    asset: None,
+                };
+
+                let beacon_info =
+                    location.beacon_info.expect("Live location share is missing the beacon_info");
+
+                listener.call(vec![LiveLocationShare {
+                    last_location: LastLocation {
+                        location: last_location,
+                        ts: location.last_location.ts.0.into(),
+                    },
+                    is_live: beacon_info.is_live(),
+                    user_id: location.user_id.to_string(),
+                }]);
+            }
+        })))
+
+        // Useful when calling observe live location shares
+        // Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
+        //     let subscription = room.observe_live_location_shares();
+        //     let mut stream = subscription.subscribe();
+        //     let mut pinned_stream = pin!(stream);
+        //
+        //     while let Some(event) = pinned_stream.next().await {
+        //         let last_location = LocationContent {
+        //             body: "".to_string(),
+        //             geo_uri:
+        // event.last_location.location.uri.clone().to_string(),
+        //             description: None,
+        //             zoom_level: None,
+        //             asset: None,
+        //         };
+        //
+        //         let beacon_info =
+        //             event.beacon_info.expect("Live location share is missing
+        // the beacon_info");
+        //
+        //         listener.call(vec![LiveLocationShare {
+        //             last_location: LastLocation {
+        //                 location: last_location,
+        //                 ts: event.last_location.ts.0.into(),
+        //             },
+        //             is_live: beacon_info.is_live(),
+        //             user_id: event.user_id.to_string(),
+        //         }])
+        //     }
+        // })))
+    }
+
+    /// Start the current users live location share in the room.
+    pub async fn start_live_location_share(&self, duration_millis: u64) -> Result<(), ClientError> {
+        self.inner.start_live_location_share(duration_millis, None).await?;
+        Ok(())
+    }
+
+    /// Stop the current users live location share in the room.
+    pub async fn stop_live_location_share(&self) -> Result<(), ClientError> {
+        self.inner.stop_live_location_share().await.expect("Unable to stop live location share");
+        Ok(())
+    }
+
+    /// Send the current users live location beacon in the room.
+    pub async fn send_live_location(&self, geo_uri: String) -> Result<(), ClientError> {
+        self.inner.send_location_beacon(geo_uri).await.expect("Unable to send location beacon");
+        Ok(())
     }
 
     /// Set (or unset) a flag on the room to indicate that the user has
@@ -983,6 +1073,11 @@ pub trait TypingNotificationsListener: Sync + Send {
 #[matrix_sdk_ffi_macros::export(callback_interface)]
 pub trait IdentityStatusChangeListener: Sync + Send {
     fn call(&self, identity_status_change: Vec<IdentityStatusChange>);
+}
+
+#[matrix_sdk_ffi_macros::export(callback_interface)]
+pub trait LiveLocationShareListener: Sync + Send {
+    fn call(&self, live_location_shares: Vec<LiveLocationShare>);
 }
 
 #[derive(uniffi::Object)]

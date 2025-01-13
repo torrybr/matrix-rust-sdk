@@ -46,6 +46,7 @@ use ruma::{
     EventId, OwnedUserId, RoomVersionId,
 };
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::MinimalStateEvent;
 
@@ -187,6 +188,7 @@ impl BaseRoomInfo {
     pub fn handle_state_event(&mut self, ev: &AnySyncStateEvent) -> bool {
         match ev {
             AnySyncStateEvent::BeaconInfo(b) => {
+                warn!("TORRY: inserting beacon_info, {:?}", b);
                 self.beacons.insert(b.state_key().clone(), b.into());
             }
             // No redacted branch - enabling encryption cannot be undone.
