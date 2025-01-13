@@ -144,6 +144,13 @@ impl StateStoreIntegrationTests for DynStateStore {
         room.handle_state_event(&topic_event);
         changes.add_state_event(room_id, topic_event, topic_raw);
 
+        let beacon_info_json: &JsonValue = &test_json::BEACON_INFO;
+        let beacon_info_raw =
+            serde_json::from_value::<Raw<AnySyncStateEvent>>(beacon_info_json.clone()).unwrap();
+        let beacon_info_event = beacon_info_raw.deserialize().unwrap();
+        room.handle_state_event(&beacon_info_event);
+        changes.add_state_event(room_id, beacon_info_event, beacon_info_raw);
+
         let mut room_ambiguity_map = HashMap::new();
         let mut room_profiles = BTreeMap::new();
 

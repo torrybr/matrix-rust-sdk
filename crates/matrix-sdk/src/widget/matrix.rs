@@ -64,6 +64,7 @@ impl MatrixDriver {
         event_type: MessageLikeEventType,
         limit: u32,
     ) -> Result<Vec<Raw<AnyTimelineEvent>>> {
+        // Copied from `read_message_like_events`
         let options = assign!(MessagesOptions::backward(), {
             limit: limit.into(),
             filter: assign!(RoomEventFilter::default(), {
