@@ -546,7 +546,7 @@ impl_event_handler!(A, B, C, D, E, F, G, H);
 ///
 /// To create such observer, use [`Client::observe_events`] or
 /// [`Client::observe_room_events`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ObservableEventHandler<T> {
     /// This type is actually nothing more than a thin glue layer between the
     /// [`EventHandler`] mechanism and the reactive programming types from

@@ -63,7 +63,7 @@ use ruma::{
         config::{set_global_account_data, set_room_account_data},
         context,
         error::ErrorKind,
-        filter::LazyLoadOptions,
+        filter::{LazyLoadOptions, RoomEventFilter},
         membership::{
             ban_user, forget_room, get_member_events,
             invite_user::{self, v3::InvitationRecipient},
@@ -80,7 +80,7 @@ use ruma::{
     },
     assign,
     events::{
-        beacon::BeaconEventContent,
+        beacon::{BeaconEventContent, OriginalSyncBeaconEvent},
         beacon_info::BeaconInfoEventContent,
         call::notify::{ApplicationType, CallNotifyEventContent, NotifyType},
         direct::DirectEventContent,
@@ -139,7 +139,7 @@ use crate::{
     error::{BeaconError, WrongRoomState},
     event_cache::{self, EventCacheDropHandles, RoomEventCache},
     event_handler::{EventHandler, EventHandlerDropGuard, EventHandlerHandle, SyncEvent},
-    live_location_share::ObservableLiveLocation,
+    live_location_share::{LastLocation, LiveLocationShare, ObservableLiveLocation},
     media::{MediaFormat, MediaRequestParameters},
     notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode},
     room::{
@@ -2599,6 +2599,14 @@ impl Room {
             .user_can_send_state(user_id, StateEventType::RoomPinnedEvents))
     }
 
+    /// Returns true if the user with the given user_id is able to send start a
+    /// live location share in this room.
+    ///
+    /// The call may fail if there is an error in getting the power levels.
+    pub async fn can_user_share_live_location(&self, user_id: &UserId) -> Result<bool> {
+        Ok(self.power_levels().await?.user_can_send_state(user_id, StateEventType::BeaconInfo))
+    }
+
     /// Returns true if the user with the given user_id is able to trigger a
     /// notification in the room.
     ///
@@ -3042,7 +3050,7 @@ impl Room {
     ///
     /// Returns an error if the event is redacted, stripped, not found or could
     /// not be deserialized.
-    pub(crate) async fn get_user_beacon_info(
+    pub async fn get_user_beacon_info(
         &self,
         user_id: &UserId,
     ) -> Result<OriginalSyncStateEvent<BeaconInfoEventContent>, BeaconError> {
@@ -3105,7 +3113,7 @@ impl Room {
         Ok(self.send_state_event_for_key(self.own_user_id(), beacon_info_event.content).await?)
     }
 
-    /// Send a location beacon event in the current room.
+    /// Send the current users location as a live location sharing beacon.
     ///
     /// # Arguments
     ///
@@ -3219,6 +3227,7 @@ impl Room {
         ObservableLiveLocation::new(&self.client, self.room_id())
     }
 
+<<<<<<< HEAD
     /// Subscribe to knock requests in this `Room`.
     ///
     /// The current requests to join the room will be emitted immediately
@@ -3365,6 +3374,64 @@ impl Room {
     /// Access the room settings related to privacy and visibility.
     pub fn privacy_settings(&self) -> RoomPrivacySettings<'_> {
         RoomPrivacySettings::new(&self.inner, &self.client)
+    }
+
+    /// Load the last 200 images sent in the room.
+    pub async fn load_image_events(&self) -> Result<Vec<Raw<AnyTimelineEvent>>> {
+        let options = assign!(MessagesOptions::backward(), {
+            limit: UInt::try_from(200)?,
+            filter: assign!(RoomEventFilter::default(), {
+                types: Some(vec!["m.image".to_owned()]),
+            }),
+        });
+
+        let messages = self.messages(options).await?;
+        Ok(messages.chunk.into_iter().map(|ev| ev.into_raw().cast()).collect())
+    }
+
+    /// Subscribe to live location sharing events for this room.
+    ///
+    /// The returned receiver will receive a new event for each sync response
+    /// that contains a 'm.beacon' event.
+    pub fn subscribe_to_live_location_shares(
+        &self,
+    ) -> (EventHandlerDropGuard, broadcast::Receiver<LiveLocationShare>) {
+        let (sender, receiver) = broadcast::channel(128);
+
+        let room_id = self.room_id().to_owned();
+        let room = self.clone();
+
+        let beacon_event_handler_handle = self.client.add_room_event_handler(&room_id, {
+            move |event: OriginalSyncBeaconEvent| async move {
+                let user_id = event.sender;
+
+                // Do not return your own beacon events
+                if user_id == room.own_user_id() {
+                    return;
+                }
+
+                let beacon_info = match room.get_user_beacon_info(&user_id).await {
+                    Ok(info) => info.content,
+                    Err(e) => {
+                        warn!(user_id = ?user_id, "Failed to get beacon info: {:?}", e);
+                        return;
+                    }
+                };
+
+                let live_location_share = LiveLocationShare {
+                    last_location: LastLocation {
+                        location: event.content.location,
+                        ts: event.content.ts,
+                    },
+                    beacon_info: Some(beacon_info),
+                    user_id,
+                };
+
+                let _ = sender.send(live_location_share);
+            }
+        });
+        let drop_guard = self.client().event_handler_drop_guard(beacon_event_handler_handle);
+        (drop_guard, receiver)
     }
 }
 
