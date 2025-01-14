@@ -3227,7 +3227,6 @@ impl Room {
         ObservableLiveLocation::new(&self.client, self.room_id())
     }
 
-<<<<<<< HEAD
     /// Subscribe to knock requests in this `Room`.
     ///
     /// The current requests to join the room will be emitted immediately
