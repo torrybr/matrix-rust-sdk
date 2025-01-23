@@ -37,9 +37,10 @@ use crate::{
     error::{ClientError, MediaInfoError, NotYetImplemented, RoomError},
     event::{MessageLikeEventType, StateEventType},
     identity_status_change::IdentityStatusChange,
+    live_location_share::{LastLocation, LiveLocationShare},
     room_info::RoomInfo,
     room_member::RoomMember,
-    ruma::{ImageInfo, Mentions, NotifyType},
+    ruma::{ImageInfo, LocationContent, Mentions, NotifyType},
     timeline::{
         configuration::{AllowedMessageTypes, TimelineConfiguration},
         ReceiptType, SendHandle, Timeline,
@@ -969,6 +970,82 @@ impl Room {
         let visibility = self.inner.privacy_settings().get_room_visibility().await?;
         Ok(visibility.into())
     }
+
+    /// Start the current users live location share in the room.
+    pub async fn start_live_location_share(&self, duration_millis: u64) -> Result<(), ClientError> {
+        self.inner.start_live_location_share(duration_millis, None).await?;
+        Ok(())
+    }
+
+    /// Stop the current users live location share in the room.
+    pub async fn stop_live_location_share(&self) -> Result<(), ClientError> {
+        self.inner.stop_live_location_share().await.expect("Unable to stop live location share");
+        Ok(())
+    }
+
+    /// Send the current users live location beacon in the room.
+    pub async fn send_live_location(&self, geo_uri: String) -> Result<(), ClientError> {
+        self.inner.send_location_beacon(geo_uri).await.expect("Unable to send location beacon");
+        Ok(())
+    }
+
+    // /// Subscribes to requests to join this room (knock member events), using a
+    // /// `listener` to be notified of the changes.
+    // ///
+    // /// The current requests to join the room will be emitted immediately
+    // /// when subscribing, along with a [`TaskHandle`] to cancel the
+    // /// subscription.
+    // pub async fn subscribe_to_knock_requests(
+    //     self: Arc<Self>,
+    //     listener: Box<dyn KnockRequestsListener>,
+    // ) -> Result<Arc<TaskHandle>, ClientError> {
+    //     let (stream, seen_ids_cleanup_handle) =
+    // self.inner.subscribe_to_knock_requests().await?;
+    //
+    //     let handle = Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
+    //         pin_mut!(stream);
+    //         while let Some(requests) = stream.next().await {
+    //             listener.call(requests.into_iter().map(Into::into).collect());
+    //         }
+    //         // Cancel the seen ids cleanup task
+    //         seen_ids_cleanup_handle.abort();
+    //     })));
+    //
+    //     Ok(handle)
+    // }
+
+    pub fn subscribe_to_live_location_shares(
+        self: Arc<Self>,
+        listener: Box<dyn LiveLocationShareListener>,
+    ) -> Arc<TaskHandle> {
+        let subscription = self.inner.observe_live_location_shares();
+        let stream = subscription.subscribe();
+
+        Arc::new(TaskHandle::new(RUNTIME.spawn(async move {
+            pin_mut!(stream);
+            while let Some(event) = stream.next().await {
+                let last_location = LocationContent {
+                    body: "".to_string(),
+                    geo_uri: event.last_location.location.uri.clone().to_string(),
+                    description: None,
+                    zoom_level: None,
+                    asset: None,
+                };
+
+                let beacon_info =
+                    event.beacon_info.expect("Live location share is missing the beacon_info");
+
+                listener.call(vec![LiveLocationShare {
+                    last_location: LastLocation {
+                        location: last_location,
+                        ts: event.last_location.ts.0.into(),
+                    },
+                    is_live: beacon_info.is_live(),
+                    user_id: event.user_id.to_string(),
+                }])
+            }
+        })))
+    }
 }
 
 impl From<matrix_sdk::room::knock_requests::KnockRequest> for KnockRequest {
@@ -985,6 +1062,11 @@ impl From<matrix_sdk::room::knock_requests::KnockRequest> for KnockRequest {
             actions: Arc::new(KnockRequestActions { inner: request }),
         }
     }
+}
+
+#[matrix_sdk_ffi_macros::export(callback_interface)]
+pub trait LiveLocationShareListener: Sync + Send {
+    fn call(&self, live_location_shares: Vec<LiveLocationShare>);
 }
 
 /// A listener for receiving new requests to a join a room.
