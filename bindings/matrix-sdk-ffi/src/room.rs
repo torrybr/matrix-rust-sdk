@@ -1010,7 +1010,7 @@ impl Room {
                     geo_uri:
         event.last_location.location.uri.clone().to_string(),
                     description: None,
-                    zoom_level: None,
+                    zoom_level: None,pu
                     asset: None,
                 };
 
