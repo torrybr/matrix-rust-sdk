@@ -230,6 +230,12 @@ pub fn default_event_filter(event: &AnySyncTimelineEvent, room_version: &RoomVer
                             )
                         }
 
+                        // DO not render a beacon event in the timeline.
+                        AnyMessageLikeEventContent::Beacon(e) => {
+                            warn!("Beacon event in UI timeline {:?}", e);
+                            false
+                        },
+
                         AnyMessageLikeEventContent::Sticker(_)
                         | AnyMessageLikeEventContent::UnstablePollStart(
                             UnstablePollStartEventContent::New(_),
