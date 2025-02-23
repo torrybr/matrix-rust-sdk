@@ -606,6 +606,8 @@ impl TryFrom<&ImageInfo> for BaseImageInfo {
             size: Some(size),
             blurhash: Some(blurhash),
             is_animated: value.is_animated,
+            lat: None,
+            lng: None,
         })
     }
 }

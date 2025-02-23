@@ -41,6 +41,10 @@ pub struct BaseImageInfo {
     pub blurhash: Option<String>,
     /// Whether this image is animated.
     pub is_animated: Option<bool>,
+    /// Exif latitude information
+    pub lat: Option<UInt>,
+    /// Exif longitude information
+    pub lng: Option<UInt>,
 }
 
 /// Base metadata about a video.
