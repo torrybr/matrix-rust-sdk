@@ -3165,6 +3165,21 @@ impl Room {
         Ok(self.send_state_event_for_key(self.own_user_id(), beacon_info_event.content).await?)
     }
 
+    /// Highlight the live location of the current user.
+    pub async fn highlight_live_location(
+        &self,
+        highlight_color: Option<String>
+    ) -> Result<send_state_event::v3::Response, BeaconError> {
+        self.ensure_room_joined()?;
+
+        let mut beacon_info_event = self.get_user_beacon_info(self.own_user_id()).await?;
+
+        // TODO: is just setting the color enough to imply an active highlight?
+        beacon_info_event.content.highlight();
+        beacon_info_event.content.set_highlight_color(highlight_color);
+        Ok(self.send_state_event_for_key(self.own_user_id(), beacon_info_event.content).await?)
+    }
+
     /// Send a location beacon event in the current room.
     ///
     /// # Arguments

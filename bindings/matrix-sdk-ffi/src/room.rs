@@ -1010,14 +1010,20 @@ impl Room {
     }
 
     /// Start the current users live location share in the room.
-    pub async fn start_live_location_share(&self, duration_millis: u64) -> Result<(), ClientError> {
-        self.inner.start_live_location_share(duration_millis, None).await?;
+    pub async fn start_live_location_share(&self, duration_millis: u64, description: Option<String>) -> Result<(), ClientError> {
+        self.inner.start_live_location_share(duration_millis, description).await?;
         Ok(())
     }
 
     /// Stop the current users live location share in the room.
     pub async fn stop_live_location_share(&self) -> Result<(), ClientError> {
         self.inner.stop_live_location_share().await.expect("Unable to stop live location share");
+        Ok(())
+    }
+
+    /// Highlight the current users live location share in the room.
+    pub async fn highlight_live_location_share(&self, highlight_color: Option<String>) -> Result<(), ClientError> {
+        self.inner.highlight_live_location(highlight_color).await.expect("Unable to highlight live location share");
         Ok(())
     }
 
