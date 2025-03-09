@@ -250,6 +250,7 @@ where
 
 #[derive(Clone, uniffi::Enum)]
 pub enum StateEventType {
+    BeaconInfo,
     CallMember,
     PolicyRuleRoom,
     PolicyRuleServer,
@@ -277,6 +278,7 @@ pub enum StateEventType {
 impl From<StateEventType> for ruma::events::StateEventType {
     fn from(val: StateEventType) -> Self {
         match val {
+            StateEventType::BeaconInfo => Self::BeaconInfo,
             StateEventType::CallMember => Self::CallMember,
             StateEventType::PolicyRuleRoom => Self::PolicyRuleRoom,
             StateEventType::PolicyRuleServer => Self::PolicyRuleServer,
@@ -305,6 +307,7 @@ impl From<StateEventType> for ruma::events::StateEventType {
 
 #[derive(Clone, uniffi::Enum)]
 pub enum MessageLikeEventType {
+    Beacon,
     CallAnswer,
     CallCandidates,
     CallHangup,
@@ -333,6 +336,7 @@ pub enum MessageLikeEventType {
 impl From<MessageLikeEventType> for ruma::events::MessageLikeEventType {
     fn from(val: MessageLikeEventType) -> Self {
         match val {
+            MessageLikeEventType::Beacon => Self::Beacon,
             MessageLikeEventType::CallAnswer => Self::CallAnswer,
             MessageLikeEventType::CallInvite => Self::CallInvite,
             MessageLikeEventType::CallNotify => Self::CallNotify,

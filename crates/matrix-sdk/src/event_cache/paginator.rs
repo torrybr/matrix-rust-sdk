@@ -21,8 +21,8 @@ use std::{future::Future, sync::Mutex};
 
 use eyeball::{SharedObservable, Subscriber};
 use matrix_sdk_base::{deserialized_responses::TimelineEvent, SendOutsideWasm, SyncOutsideWasm};
-use ruma::{api::Direction, EventId, OwnedEventId, UInt};
-
+use ruma::{api::Direction, assign, EventId, OwnedEventId, UInt};
+use ruma::api::client::filter::RoomEventFilter;
 use super::pagination::PaginationToken;
 use crate::{
     room::{EventWithContextResponse, Messages, MessagesOptions, WeakRoom},
@@ -349,6 +349,13 @@ impl<PR: PaginableRoom> Paginator<PR> {
 
         let mut options = MessagesOptions::new(dir).from(token.as_deref());
         options.limit = num_events;
+
+        if dir == Direction::Backward {
+            // TODO(tb): Pass in a room event filter to the paginator.
+            options.filter = assign!(RoomEventFilter::default(), {
+                not_types: vec!["org.matrix.msc3672.beacon".to_owned()]
+            })
+        }
 
         // In case of error, the state is reset to idle automatically thanks to
         // reset_state_guard.
